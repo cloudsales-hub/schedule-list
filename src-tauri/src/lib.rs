@@ -7,7 +7,11 @@ use std::sync::Mutex;
 
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use settings::{data_file, load_settings_file, resolve_data_dir, save_settings_file, Settings};
-use tauri::{AppHandle, Emitter, Manager, State};
+use std::time::Duration;
+
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, State};
 
 /// 앱 전체가 공유하는 상태.
 pub struct AppState {
@@ -66,6 +70,73 @@ fn save_settings(app: AppHandle, state: State<'_, AppState>, settings: Settings)
     Ok(())
 }
 
+/// 이미 만들어진 창을 보여 주고 앞으로 가져온다. 없는 창이면 오류를 돌려준다.
+#[tauri::command]
+fn show_window(app: AppHandle, label: String) -> Result<(), String> {
+    let win = app
+        .get_webview_window(&label)
+        .ok_or_else(|| format!("'{label}' 창이 없습니다"))?;
+    win.show().map_err(|e| e.to_string())?;
+    win.set_focus().map_err(|e| e.to_string())
+}
+
+/// 위젯을 5초간 맨 앞으로 올렸다가 다시 바탕화면 위치(맨 아래)로 내린다.
+fn peek_widget(app: &AppHandle) {
+    let Some(win) = app.get_webview_window("widget") else { return };
+    let _ = win.show();
+    let _ = win.set_always_on_bottom(false);
+    let _ = win.set_always_on_top(true);
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_secs(5));
+        let _ = win.set_always_on_top(false);
+        let _ = win.set_always_on_bottom(true);
+    });
+}
+
+fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
+    let quit = MenuItem::with_id(app, "quit", "종료", true, None::<&str>)?;
+    let menu = Menu::with_items(app, &[&quit])?;
+    let mut builder = TrayIconBuilder::new()
+        .menu(&menu)
+        .show_menu_on_left_click(false)
+        .tooltip("일정·할일 위젯")
+        .on_menu_event(|app, event| {
+            if event.id.as_ref() == "quit" {
+                app.exit(0);
+            }
+        })
+        .on_tray_icon_event(|tray, event| {
+            if let TrayIconEvent::Click {
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+                ..
+            } = event
+            {
+                peek_widget(tray.app_handle());
+            }
+        });
+    if let Some(icon) = app.default_window_icon() {
+        builder = builder.icon(icon.clone());
+    }
+    builder.build(app)?;
+    Ok(())
+}
+
+/// 저장된 위치가 없는 첫 실행이면 위젯을 화면 오른쪽 위에 놓는다.
+fn place_widget_first_time(app: &AppHandle) {
+    let state_file = app.path().app_config_dir().map(|d| d.join(".window-state.json"));
+    if matches!(&state_file, Ok(f) if f.exists()) {
+        return;
+    }
+    let Some(win) = app.get_webview_window("widget") else { return };
+    let Ok(Some(monitor)) = win.primary_monitor() else { return };
+    let Ok(size) = win.outer_size() else { return };
+    let margin = (24.0 * monitor.scale_factor()) as i32;
+    let x = monitor.position().x + monitor.size().width as i32 - size.width as i32 - margin;
+    let y = monitor.position().y + margin;
+    let _ = win.set_position(PhysicalPosition::new(x, y));
+}
+
 /// 현재 데이터 폴더를 감시한다. 폴더가 바뀌면 다시 호출해서 감시 대상을 바꾼다.
 fn restart_watcher(app: &AppHandle) {
     let state = app.state::<AppState>();
@@ -105,7 +176,8 @@ fn restart_watcher(app: &AppHandle) {
 pub fn run() {
     tauri::Builder::default()
         // 앱이 두 번 뜨지 않게 한다. (이후 Task에서 기존 창을 앞으로 가져오도록 확장)
-        .plugin(tauri_plugin_single_instance::init(|_app, _args, _cwd| {}))
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| peek_widget(app)))
+        .plugin(tauri_plugin_window_state::Builder::default().build())
         .setup(|app| {
             let home = app.path().home_dir().unwrap_or_default();
             let app_data = app.path().app_data_dir()?;
@@ -120,6 +192,8 @@ pub fn run() {
                 settings_file,
             });
             restart_watcher(app.handle());
+            setup_tray(app.handle())?;
+            place_widget_first_time(app.handle());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -127,7 +201,8 @@ pub fn run() {
             write_data,
             backup_corrupt_data,
             get_settings,
-            save_settings
+            save_settings,
+            show_window
         ])
         .run(tauri::generate_context!())
         .expect("앱을 실행하지 못했습니다");

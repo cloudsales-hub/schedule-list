@@ -1,0 +1,116 @@
+import type { CSSProperties, MouseEvent } from 'react';
+import type { Item } from '../core/model';
+import { plainTodos, urgentTasks } from '../core/selectors';
+import type { ItemsStore } from '../core/store';
+import { dueLabel } from './dueLabel';
+import { MemoInput } from './MemoInput';
+import { color, ellipsis, font } from './styles';
+import { useNow } from './useNow';
+import { useStore } from './useStore';
+
+interface Props {
+  store: ItemsStore;
+  hotkeyLabel: string;
+  onOpenQuick(): void;
+  onOpenDashboard(): void;
+}
+
+const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
+const stop = (e: MouseEvent) => e.stopPropagation();
+
+const listStyle: CSSProperties = { overflowY: 'auto', maxHeight: 220, margin: 0, padding: 0, listStyle: 'none' };
+
+function Row({ item, store, now }: { item: Item; store: ItemsStore; now: Date }) {
+  const label = dueLabel(item, now);
+  return (
+    <li data-testid="row" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', fontSize: 13 }}>
+      <input
+        type="checkbox"
+        checked={false}
+        aria-label={`${item.text} 완료`}
+        onClick={stop}
+        onChange={() => void store.update(item.id, { done: true })}
+      />
+      <span style={{ ...ellipsis, flex: 1, minWidth: 0 }}>{item.text}</span>
+      {label && (
+        <span
+          data-overdue={String(label.overdue)}
+          style={{ fontSize: 11, flexShrink: 0, color: label.overdue ? color.red : color.sub }}
+        >
+          {label.text}
+        </span>
+      )}
+    </li>
+  );
+}
+
+export function Widget({ store, hotkeyLabel, onOpenQuick, onOpenDashboard }: Props) {
+  useStore(store);
+  const now = useNow();
+  const urgent = urgentTasks(store.items, now);
+  const todos = plainTodos(store.items);
+
+  return (
+    <div
+      onClick={onOpenDashboard}
+      style={{
+        boxSizing: 'border-box',
+        height: '100vh',
+        padding: 14,
+        background: color.bg,
+        color: color.text,
+        fontFamily: font,
+        borderRadius: 12,
+        overflow: 'hidden',
+        cursor: 'pointer',
+      }}
+    >
+      {store.status === 'error' && store.error && (
+        <div role="alert" style={{ marginBottom: 8, fontSize: 12, color: color.red }}>
+          {store.error}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+        <strong style={{ fontSize: 15 }}>
+          {now.getMonth() + 1}월 {now.getDate()}일 ({WEEKDAYS[now.getDay()]})
+        </strong>
+        <button
+          onClick={(e) => {
+            stop(e);
+            onOpenQuick();
+          }}
+          style={{
+            background: 'transparent',
+            color: color.text,
+            border: `1px solid ${color.sub}`,
+            borderRadius: 6,
+            padding: '3px 8px',
+            fontSize: 12,
+            cursor: 'pointer',
+          }}
+        >
+          ＋ 메모 <span style={{ color: color.sub }}>{hotkeyLabel}</span>
+        </button>
+      </div>
+
+      <div onClick={stop} style={{ marginBottom: 12, cursor: 'auto' }}>
+        <MemoInput store={store} now={() => new Date()} />
+      </div>
+
+      <h3 style={{ fontSize: 12, color: color.sub, margin: '8px 0 4px' }}>🔥 급한 것</h3>
+      <ul data-testid="urgent-list" style={listStyle}>
+        {urgent.map((it) => (
+          <Row key={it.id} item={it} store={store} now={now} />
+        ))}
+      </ul>
+
+      <h3 style={{ fontSize: 12, color: color.sub, margin: '12px 0 4px' }}>📝 할일 ({todos.length})</h3>
+      <ul data-testid="todo-list" style={{ ...listStyle, maxHeight: 180 }}>
+        {todos.map((it) => (
+          <Row key={it.id} item={it} store={store} now={now} />
+        ))}
+      </ul>
+    </div>
+  );
+}

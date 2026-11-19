@@ -46,3 +46,12 @@ export function getSettings(): Promise<Settings> {
 export async function saveSettings(settings: Settings): Promise<void> {
   await invoke('save_settings', { settings });
 }
+
+/** 이미 만들어진 창을 앞으로 가져온다. 아직 없는 창이면 조용히 넘어간다. */
+export async function showWindow(label: 'widget' | 'quick' | 'dashboard'): Promise<void> {
+  try {
+    await invoke('show_window', { label });
+  } catch {
+    // 해당 창은 이후 작업에서 추가된다.
+  }
+}
