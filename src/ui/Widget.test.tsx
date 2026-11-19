@@ -154,6 +154,21 @@ describe('Widget', () => {
     expect(long).toHaveStyle({ whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' });
   });
 
+  test('안내 문구(notice)가 있으면 위쪽에 보여 준다', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(NOW);
+    render(
+      <Widget
+        store={fakeStore([])}
+        hotkeyLabel="Win+J"
+        notice="이미 사용 중인 키입니다. 설정에서 다른 키를 골라 주세요"
+        onOpenQuick={() => {}}
+        onOpenDashboard={() => {}}
+      />,
+    );
+    expect(screen.getByRole('status')).toHaveTextContent('이미 사용 중인 키입니다');
+  });
+
   test('저장소 오류 문구를 위쪽에 보여 준다', () => {
     setup([], { status: 'error', error: '데이터 파일을 저장하지 못했습니다: disk full' });
     expect(screen.getByRole('alert')).toHaveTextContent('데이터 파일을 저장하지 못했습니다: disk full');

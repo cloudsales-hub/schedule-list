@@ -2,6 +2,16 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "위젯, 빠른 입력, 대시보드 창의 기본 권한",
-  "windows": ["widget", "quick", "dashboard"],
-  "permissions": ["core:default"]
+  "windows": [
+    "widget",
+    "quick",
+    "dashboard"
+  ],
+  "permissions": [
+    "core:default",
+    "core:window:allow-hide",
+    "core:window:allow-show",
+    "core:window:allow-set-focus",
+    "core:window:allow-center"
+  ]
 }

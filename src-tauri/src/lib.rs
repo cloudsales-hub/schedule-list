@@ -12,6 +12,7 @@ use std::time::Duration;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, State};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
 /// 앱 전체가 공유하는 상태.
 pub struct AppState {
@@ -19,6 +20,8 @@ pub struct AppState {
     /// 마지막으로 읽거나 쓴 데이터 파일 내용. 감시 이벤트 중복을 걸러내는 데 쓴다.
     last_seen: Mutex<Option<String>>,
     watcher: Mutex<Option<RecommendedWatcher>>,
+    /// 단축키 등록에 실패했을 때의 이유. 위젯이 나중에 켜져도 알 수 있게 보관한다.
+    hotkey_error: Mutex<Option<String>>,
     home: PathBuf,
     app_data: PathBuf,
     settings_file: PathBuf,
@@ -67,12 +70,52 @@ fn save_settings(app: AppHandle, state: State<'_, AppState>, settings: Settings)
         .map_err(|e| format!("설정을 저장하지 못했습니다: {e}"))?;
     *state.settings.lock().unwrap() = settings;
     restart_watcher(&app);
+    register_hotkey(&app);
     Ok(())
+}
+
+#[tauri::command]
+fn get_hotkey_error(state: State<'_, AppState>) -> Option<String> {
+    state.hotkey_error.lock().unwrap().clone()
+}
+
+/// 빠른 입력창을 가운데에 열고 입력칸을 비운 채 포커스한다. 이미 열려 있어도 다시 포커스한다.
+fn open_quick(app: &AppHandle) {
+    let Some(win) = app.get_webview_window("quick") else { return };
+    let _ = win.center();
+    let _ = win.show();
+    let _ = win.set_focus();
+    let _ = app.emit_to("quick", "quick-open", ());
+}
+
+/// 설정의 단축키를 (다시) 등록한다. 실패하면 이유를 보관하고 `hotkey-failed`를 알린다.
+fn register_hotkey(app: &AppHandle) {
+    let hotkey = app.state::<AppState>().settings.lock().unwrap().hotkey.clone();
+    let gs = app.global_shortcut();
+    let _ = gs.unregister_all();
+    let result = gs.on_shortcut(hotkey.as_str(), |app, _shortcut, event| {
+        if event.state() == ShortcutState::Pressed {
+            open_quick(app);
+        }
+    });
+    let state = app.state::<AppState>();
+    match result {
+        Ok(()) => *state.hotkey_error.lock().unwrap() = None,
+        Err(e) => {
+            let msg = format!("이미 사용 중인 키입니다. 설정에서 다른 키를 골라 주세요 ({hotkey}: {e})");
+            *state.hotkey_error.lock().unwrap() = Some(msg.clone());
+            let _ = app.emit("hotkey-failed", msg);
+        }
+    }
 }
 
 /// 이미 만들어진 창을 보여 주고 앞으로 가져온다. 없는 창이면 오류를 돌려준다.
 #[tauri::command]
 fn show_window(app: AppHandle, label: String) -> Result<(), String> {
+    if label == "quick" {
+        open_quick(&app);
+        return Ok(());
+    }
     let win = app
         .get_webview_window(&label)
         .ok_or_else(|| format!("'{label}' 창이 없습니다"))?;
@@ -177,7 +220,13 @@ pub fn run() {
     tauri::Builder::default()
         // 앱이 두 번 뜨지 않게 한다. (이후 Task에서 기존 창을 앞으로 가져오도록 확장)
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| peek_widget(app)))
-        .plugin(tauri_plugin_window_state::Builder::default().build())
+        .plugin(
+            tauri_plugin_window_state::Builder::default()
+                // 빠른 입력창은 항상 숨긴 채로 시작해야 하므로 위치·보임 상태를 기억하지 않는다.
+                .with_denylist(&["quick"])
+                .build(),
+        )
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .setup(|app| {
             let home = app.path().home_dir().unwrap_or_default();
             let app_data = app.path().app_data_dir()?;
@@ -187,11 +236,13 @@ pub fn run() {
                 settings: Mutex::new(settings),
                 last_seen: Mutex::new(None),
                 watcher: Mutex::new(None),
+                hotkey_error: Mutex::new(None),
                 home,
                 app_data,
                 settings_file,
             });
             restart_watcher(app.handle());
+            register_hotkey(app.handle());
             setup_tray(app.handle())?;
             place_widget_first_time(app.handle());
             Ok(())
@@ -202,7 +253,8 @@ pub fn run() {
             backup_corrupt_data,
             get_settings,
             save_settings,
-            show_window
+            show_window,
+            get_hotkey_error
         ])
         .run(tauri::generate_context!())
         .expect("앱을 실행하지 못했습니다");

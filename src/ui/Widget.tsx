@@ -11,6 +11,8 @@ import { useStore } from './useStore';
 interface Props {
   store: ItemsStore;
   hotkeyLabel: string;
+  /** 단축키 등록 실패 같은 안내 문구 */
+  notice?: string | null;
   onOpenQuick(): void;
   onOpenDashboard(): void;
 }
@@ -44,7 +46,7 @@ function Row({ item, store, now }: { item: Item; store: ItemsStore; now: Date })
   );
 }
 
-export function Widget({ store, hotkeyLabel, onOpenQuick, onOpenDashboard }: Props) {
+export function Widget({ store, hotkeyLabel, notice, onOpenQuick, onOpenDashboard }: Props) {
   useStore(store);
   const now = useNow();
   const urgent = urgentTasks(store.items, now);
@@ -65,6 +67,11 @@ export function Widget({ store, hotkeyLabel, onOpenQuick, onOpenDashboard }: Pro
         cursor: 'pointer',
       }}
     >
+      {notice && (
+        <div role="status" style={{ marginBottom: 8, fontSize: 12, color: color.red }}>
+          {notice}
+        </div>
+      )}
       {store.status === 'error' && store.error && (
         <div role="alert" style={{ marginBottom: 8, fontSize: 12, color: color.red }}>
           {store.error}

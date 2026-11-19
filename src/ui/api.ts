@@ -55,3 +55,22 @@ export async function showWindow(label: 'widget' | 'quick' | 'dashboard'): Promi
     // 해당 창은 이후 작업에서 추가된다.
   }
 }
+
+/** 단축키 등록에 실패했다면 그 안내 문구. 아니면 null. */
+export function getHotkeyError(): Promise<string | null> {
+  return invoke<string | null>('get_hotkey_error');
+}
+
+/** 단축키 등록 실패 알림을 받는다. 해제 함수를 돌려준다. */
+export function onHotkeyFailed(cb: (message: string) => void): () => void {
+  let cancelled = false;
+  let unlisten: (() => void) | null = null;
+  void listen<string>('hotkey-failed', (e) => cb(e.payload)).then((u) => {
+    if (cancelled) u();
+    else unlisten = u;
+  });
+  return () => {
+    cancelled = true;
+    unlisten?.();
+  };
+}

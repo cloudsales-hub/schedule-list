@@ -12,6 +12,11 @@ interface Props {
   placeholder?: string;
 }
 
+function previewText(kind: ItemKind, label: string | null): string {
+  if (kind === 'event') return `🗓 일정${label ? ` · ${label}` : ''}`;
+  return label ? `인식됨 → 🔥 할일 · 마감 ${label}` : '📝 할일 (마감 없음)';
+}
+
 /** 한 줄 메모 입력. Enter 저장, Tab 일정↔할일 전환, Esc 닫기. */
 export function MemoInput({ store, now, onDone, autoFocus, placeholder = '＋ 메모 입력 후 Enter' }: Props) {
   const [value, setValue] = useState('');
@@ -32,7 +37,10 @@ export function MemoInput({ store, now, onDone, autoFocus, placeholder = '＋ �
       }
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      if (!parsed) return;
+      if (!parsed) {
+        onDone?.(); // 빈 입력은 저장 없이 닫는다
+        return;
+      }
       void store.add({ text: parsed.text, kind, due: parsed.due, hasTime: parsed.hasTime });
       setValue('');
       setOverride(null);
@@ -65,8 +73,7 @@ export function MemoInput({ store, now, onDone, autoFocus, placeholder = '＋ �
       />
       {parsed && (
         <div style={{ marginTop: 4, fontSize: 11, color: color.sub }}>
-          {kind === 'event' ? '일정' : '할일'}
-          {parsed.label ? ` · ${parsed.label}` : ''}
+          {previewText(kind, parsed.label)}
           {parsed.due ? ' · Tab으로 종류 바꾸기' : ''}
         </div>
       )}
