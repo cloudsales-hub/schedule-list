@@ -39,10 +39,27 @@
         "resizable": false,
         "shadow": true,
         "visible": false
+      },
+      {
+        "label": "dashboard",
+        "title": "내 일정·할일",
+        "url": "dashboard.html",
+        "width": 900,
+        "height": 600,
+        "center": true,
+        "visible": false,
+        "minWidth": 700,
+        "minHeight": 480
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": [
+          "**"
+        ]
+      }
     }
   },
   "bundle": {

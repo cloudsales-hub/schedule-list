@@ -11,7 +11,7 @@ use std::time::Duration;
 
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, State};
+use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, State, WindowEvent};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
 /// 앱 전체가 공유하는 상태.
@@ -222,8 +222,8 @@ pub fn run() {
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| peek_widget(app)))
         .plugin(
             tauri_plugin_window_state::Builder::default()
-                // 빠른 입력창은 항상 숨긴 채로 시작해야 하므로 위치·보임 상태를 기억하지 않는다.
-                .with_denylist(&["quick"])
+                // 빠른 입력창과 대시보드는 항상 숨긴 채로 시작해야 하므로 위치·보임 상태를 기억하지 않는다.
+                .with_denylist(&["quick", "dashboard"])
                 .build(),
         )
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
@@ -246,6 +246,15 @@ pub fn run() {
             setup_tray(app.handle())?;
             place_widget_first_time(app.handle());
             Ok(())
+        })
+        // 대시보드를 닫아도 앱은 계속 실행한다. 숨기기만 한다.
+        .on_window_event(|window, event| {
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                if window.label() == "dashboard" {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
+            }
         })
         .invoke_handler(tauri::generate_handler![
             read_data,

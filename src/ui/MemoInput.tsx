@@ -51,6 +51,7 @@ export function MemoInput({ store, now, onDone, autoFocus, placeholder = '＋ �
   return (
     <div>
       <input
+        aria-label="메모"
         value={value}
         autoFocus={autoFocus}
         placeholder={placeholder}
