@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { open } from '@tauri-apps/plugin-dialog';
 import type { Backend } from '../core/store';
 
 /** 이 PC에만 저장되는 앱 설정. 이름은 src-tauri/src/settings.rs와 같다. */
@@ -66,6 +67,40 @@ export function onHotkeyFailed(cb: (message: string) => void): () => void {
   let cancelled = false;
   let unlisten: (() => void) | null = null;
   void listen<string>('hotkey-failed', (e) => cb(e.payload)).then((u) => {
+    if (cancelled) u();
+    else unlisten = u;
+  });
+  return () => {
+    cancelled = true;
+    unlisten?.();
+  };
+}
+
+/** 처음 실행 때 데이터 폴더로 미리 채워 줄 OneDrive 안 폴더. 없으면 null. */
+export function suggestedDataDir(): Promise<string | null> {
+  return invoke<string | null>('suggested_data_dir');
+}
+
+/** 폴더 선택 창. 취소하면 null. */
+export async function pickFolder(): Promise<string | null> {
+  const r = await open({ directory: true, multiple: false });
+  return typeof r === 'string' ? r : null;
+}
+
+/** 배너로 쓸 이미지 파일 선택 창. 취소하면 null. */
+export async function pickImage(): Promise<string | null> {
+  const r = await open({
+    multiple: false,
+    filters: [{ name: '이미지', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif'] }],
+  });
+  return typeof r === 'string' ? r : null;
+}
+
+/** 설정이 저장되면 알려 준다(예: 위젯의 단축키 표시를 갱신). 해제 함수를 돌려준다. */
+export function onSettingsChanged(cb: () => void): () => void {
+  let cancelled = false;
+  let unlisten: (() => void) | null = null;
+  void listen('settings-changed', () => cb()).then((u) => {
     if (cancelled) u();
     else unlisten = u;
   });

@@ -161,6 +161,13 @@ describe('Dashboard', () => {
     expect(store.add).toHaveBeenCalledWith({ text: '보고서 오탈자 확인', kind: 'task', due: null, hasTime: false });
   });
 
+  test('overlay가 있으면 설정 화면을 위에 겹쳐 보여 준다', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(NOW);
+    render(<Dashboard store={fakeStore([])} settings={settings} onOpenSettings={() => {}} overlay={<p>설정 내용</p>} />);
+    expect(within(screen.getByRole('dialog', { name: '설정' })).getByText('설정 내용')).toBeInTheDocument();
+  });
+
   test('⚙를 누르면 설정을 연다', () => {
     const { onOpenSettings } = setup([]);
     fireEvent.click(screen.getByRole('button', { name: '설정' }));

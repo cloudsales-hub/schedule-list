@@ -12,6 +12,7 @@ use std::time::Duration;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, State, WindowEvent};
+use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
 /// 앱 전체가 공유하는 상태.
@@ -65,13 +66,53 @@ fn get_settings(state: State<'_, AppState>) -> Settings {
 
 #[tauri::command]
 fn save_settings(app: AppHandle, state: State<'_, AppState>, settings: Settings) -> Result<(), String> {
-    let settings = settings.normalized();
+    let mut settings = settings.normalized();
+    let (old_hotkey, old_dir) = {
+        let old = state.settings.lock().unwrap();
+        (old.hotkey.clone(), old.data_dir.clone())
+    };
+
+    // 새 단축키가 등록되지 않으면 이전 키를 그대로 쓰고 이유를 알린다.
+    if settings.hotkey != old_hotkey {
+        match try_register_hotkey(&app, &settings.hotkey) {
+            Ok(()) => *state.hotkey_error.lock().unwrap() = None,
+            Err(msg) => {
+                settings.hotkey = old_hotkey.clone();
+                let _ = try_register_hotkey(&app, &old_hotkey);
+                *state.hotkey_error.lock().unwrap() = Some(msg.clone());
+                let _ = app.emit("hotkey-failed", msg);
+            }
+        }
+    }
+
     save_settings_file(&state.settings_file, &settings)
         .map_err(|e| format!("설정을 저장하지 못했습니다: {e}"))?;
+    let dir_changed = settings.data_dir != old_dir;
+    let autostart = settings.autostart;
     *state.settings.lock().unwrap() = settings;
-    restart_watcher(&app);
-    register_hotkey(&app);
+    apply_autostart(&app, autostart);
+    let _ = app.emit("settings-changed", ());
+    if dir_changed {
+        restart_watcher(&app);
+        // 각 창이 새 폴더의 파일과 자기 데이터를 합쳐 다시 저장하도록 알린다.
+        let _ = app.emit("data-changed", ());
+    }
     Ok(())
+}
+
+/// 윈도우 시작 시 자동 실행을 설정에 맞춘다. 실패해도 앱 사용에는 지장이 없으므로 무시한다.
+fn apply_autostart(app: &AppHandle, enabled: bool) {
+    let launcher = app.autolaunch();
+    let _ = if enabled { launcher.enable() } else { launcher.disable() };
+}
+
+/// 처음 실행할 때 폴더 선택 화면에 미리 채워 줄 OneDrive 안 폴더. OneDrive가 없으면 None.
+#[tauri::command]
+fn suggested_data_dir(state: State<'_, AppState>) -> Option<String> {
+    let onedrive = state.home.join("OneDrive");
+    onedrive
+        .is_dir()
+        .then(|| onedrive.join("일정위젯").to_string_lossy().into_owned())
 }
 
 #[tauri::command]
@@ -88,21 +129,26 @@ fn open_quick(app: &AppHandle) {
     let _ = app.emit_to("quick", "quick-open", ());
 }
 
-/// 설정의 단축키를 (다시) 등록한다. 실패하면 이유를 보관하고 `hotkey-failed`를 알린다.
-fn register_hotkey(app: &AppHandle) {
-    let hotkey = app.state::<AppState>().settings.lock().unwrap().hotkey.clone();
+/// 단축키 하나만 등록한다(이전 등록은 모두 해제). 실패하면 사용자에게 보여 줄 문구를 돌려준다.
+fn try_register_hotkey(app: &AppHandle, hotkey: &str) -> Result<(), String> {
     let gs = app.global_shortcut();
     let _ = gs.unregister_all();
-    let result = gs.on_shortcut(hotkey.as_str(), |app, _shortcut, event| {
+    gs.on_shortcut(hotkey, |app, _shortcut, event| {
         if event.state() == ShortcutState::Pressed {
             open_quick(app);
         }
-    });
+    })
+    .map_err(|e| format!("이미 사용 중인 키입니다. 설정에서 다른 키를 골라 주세요 ({hotkey}: {e})"))
+}
+
+/// 설정의 단축키를 등록한다. 실패하면 이유를 보관하고 `hotkey-failed`를 알린다.
+fn register_hotkey(app: &AppHandle) {
+    let hotkey = app.state::<AppState>().settings.lock().unwrap().hotkey.clone();
+    let result = try_register_hotkey(app, &hotkey);
     let state = app.state::<AppState>();
     match result {
         Ok(()) => *state.hotkey_error.lock().unwrap() = None,
-        Err(e) => {
-            let msg = format!("이미 사용 중인 키입니다. 설정에서 다른 키를 골라 주세요 ({hotkey}: {e})");
+        Err(msg) => {
             *state.hotkey_error.lock().unwrap() = Some(msg.clone());
             let _ = app.emit("hotkey-failed", msg);
         }
@@ -227,6 +273,8 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let home = app.path().home_dir().unwrap_or_default();
             let app_data = app.path().app_data_dir()?;
@@ -243,6 +291,8 @@ pub fn run() {
             });
             restart_watcher(app.handle());
             register_hotkey(app.handle());
+            let autostart = app.state::<AppState>().settings.lock().unwrap().autostart;
+            apply_autostart(app.handle(), autostart);
             setup_tray(app.handle())?;
             place_widget_first_time(app.handle());
             Ok(())
@@ -263,7 +313,8 @@ pub fn run() {
             get_settings,
             save_settings,
             show_window,
-            get_hotkey_error
+            get_hotkey_error,
+            suggested_data_dir
         ])
         .run(tauri::generate_context!())
         .expect("앱을 실행하지 못했습니다");

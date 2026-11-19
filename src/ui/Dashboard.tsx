@@ -16,6 +16,8 @@ interface Props {
   store: ItemsStore;
   settings: Settings;
   onOpenSettings(): void;
+  /** 값이 있으면 대시보드 위에 겹쳐서 보여 준다(설정 화면). */
+  overlay?: ReactNode;
 }
 
 /** 사용자가 고른 이미지 파일이 있으면 그 파일을, 없으면 기본 그림을 쓴다. */
@@ -46,7 +48,7 @@ function Card({ id, title, children }: { id: string; title: string; children: Re
   );
 }
 
-export function Dashboard({ store, settings, onOpenSettings }: Props) {
+export function Dashboard({ store, settings, onOpenSettings, overlay }: Props) {
   useStore(store);
   const now = useNow(1000);
   const [view, setView] = useState(() => ({ year: now.getFullYear(), month: now.getMonth() + 1 }));
@@ -63,6 +65,15 @@ export function Dashboard({ store, settings, onOpenSettings }: Props) {
 
   return (
     <div style={{ minHeight: '100vh', background: color.bg, color: color.text, fontFamily: font }}>
+      {overlay && (
+        <div
+          role="dialog"
+          aria-label="설정"
+          style={{ position: 'fixed', inset: 0, zIndex: 10, background: color.bg, overflowY: 'auto' }}
+        >
+          {overlay}
+        </div>
+      )}
       <img
         src={bannerSrc(settings.bannerPath)}
         alt="배너"

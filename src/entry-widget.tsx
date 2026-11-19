@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ItemsStore } from './core/store';
-import { getHotkeyError, getSettings, onHotkeyFailed, showWindow, tauriBackend } from './ui/api';
+import { getHotkeyError, getSettings, onHotkeyFailed, onSettingsChanged, showWindow, tauriBackend } from './ui/api';
+import { formatHotkey } from './ui/hotkey';
 import { Widget } from './ui/Widget';
 
 function App() {
@@ -11,13 +12,18 @@ function App() {
 
   useEffect(() => {
     void store.load();
-    // Task 10에서 formatHotkey로 교체된다.
-    getSettings().then((s) => setHotkey(s.hotkey.replace('Super', 'Win')), () => {});
+    const refresh = () => getSettings().then((s) => setHotkey(formatHotkey(s.hotkey)), () => {});
+    void refresh();
+    const offSettings = onSettingsChanged(() => {
+      void refresh();
+      getHotkeyError().then(setNotice, () => {});
+    });
     getHotkeyError().then(setNotice, () => {});
     const off = onHotkeyFailed(setNotice);
     return () => {
       store.dispose();
       off();
+      offSettings();
     };
   }, [store]);
 
