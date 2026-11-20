@@ -270,8 +270,9 @@ fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
     let show = MenuItem::with_id(app, "show", "위젯 보이기", true, None::<&str>)?;
     let reset = MenuItem::with_id(app, "reset", "위젯 위치 초기화", true, None::<&str>)?;
     let dash = MenuItem::with_id(app, "dashboard", "대시보드 열기", true, None::<&str>)?;
+    let update = MenuItem::with_id(app, "update", format!("업데이트 확인 (v{})", env!("CARGO_PKG_VERSION")), true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "종료", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&show, &reset, &dash, &quit])?;
+    let menu = Menu::with_items(app, &[&show, &reset, &dash, &update, &quit])?;
     let mut builder = TrayIconBuilder::new()
         .menu(&menu)
         .show_menu_on_left_click(false)
@@ -280,6 +281,7 @@ fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
             match event.id.as_ref() {
                 "quit" => app.exit(0),
                 "show" => peek_widget(app),
+                "update" => updater::check_now(app.clone()),
                 "reset" => {
                     move_widget_to_top_right(app);
                     peek_widget(app);

@@ -13,15 +13,33 @@ const RETRY_DELAY: Duration = Duration::from_secs(120);
 pub fn check_in_background(app: AppHandle) {
     std::thread::spawn(move || {
         std::thread::sleep(FIRST_DELAY);
-        if tauri::async_runtime::block_on(check(&app)).is_err() {
+        if tauri::async_runtime::block_on(check(&app, false)).is_err() {
             std::thread::sleep(RETRY_DELAY);
-            let _ = tauri::async_runtime::block_on(check(&app));
+            let _ = tauri::async_runtime::block_on(check(&app, false));
         }
     });
 }
 
-async fn check(app: &AppHandle) -> Result<(), tauri_plugin_updater::Error> {
+/// 트레이 메뉴의 "업데이트 확인". 결과(최신 버전이거나 실패 이유)를 창으로 알려 준다.
+pub fn check_now(app: AppHandle) {
+    std::thread::spawn(move || {
+        if let Err(e) = tauri::async_runtime::block_on(check(&app, true)) {
+            app.dialog()
+                .message(format!("업데이트를 확인하지 못했습니다.\n{e}"))
+                .title("업데이트")
+                .blocking_show();
+        }
+    });
+}
+
+async fn check(app: &AppHandle, manual: bool) -> Result<(), tauri_plugin_updater::Error> {
     let Some(update) = app.updater()?.check().await? else {
+        if manual {
+            app.dialog()
+                .message(format!("최신 버전입니다. (현재 v{})", env!("CARGO_PKG_VERSION")))
+                .title("업데이트")
+                .blocking_show();
+        }
         return Ok(());
     };
     let go = app
