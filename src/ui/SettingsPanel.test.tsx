@@ -73,6 +73,13 @@ describe('SettingsPanel', () => {
     expect(screen.getByText(/윈도우에서 이미 쓰는/)).toBeInTheDocument();
   });
 
+  test('Win+J도 윈도우가 쓰는 조합이라 저장하지 않는다', () => {
+    const { onSave } = setup({ hotkey: 'Alt+Z' });
+    fireEvent.keyDown(screen.getByLabelText('단축키'), { key: 'j', code: 'KeyJ', metaKey: true });
+    expect(onSave).not.toHaveBeenCalled();
+    expect(screen.getByText(/윈도우에서 이미 쓰는/)).toBeInTheDocument();
+  });
+
   test('단축키 등록 실패 문구를 보여 준다', () => {
     setup({}, { hotkeyError: '이미 사용 중인 키입니다. 설정에서 다른 키를 골라 주세요' });
     expect(screen.getByText(/이미 사용 중인 키입니다/)).toBeInTheDocument();

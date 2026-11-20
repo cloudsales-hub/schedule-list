@@ -1,4 +1,4 @@
-import type { CSSProperties, MouseEvent } from 'react';
+import { useState, type CSSProperties, type MouseEvent } from 'react';
 import type { Item } from '../core/model';
 import { doneToday, plainTodos, urgentTasks } from '../core/selectors';
 import type { ItemsStore } from '../core/store';
@@ -32,6 +32,20 @@ const listStyle: CSSProperties = {
 
 function Row({ item, store, now }: { item: Item; store: ItemsStore; now: Date }) {
   const label = dueLabel(item, now);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(item.text);
+
+  const startEdit = () => {
+    setDraft(item.text);
+    setEditing(true);
+  };
+  // 글자가 바뀌었고 비어 있지 않을 때만 저장한다. 비워 두면 원래 글을 유지한다.
+  const commit = () => {
+    const next = draft.trim();
+    setEditing(false);
+    if (next !== '' && next !== item.text) void store.update(item.id, { text: next });
+  };
+
   return (
     <li data-testid="row" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', fontSize: 13 }}>
       <DoneToggle
@@ -39,16 +53,44 @@ function Row({ item, store, now }: { item: Item; store: ItemsStore; now: Date })
         label={`${item.text} ${item.done ? '완료 취소' : '완료'}`}
         onToggle={() => void store.update(item.id, { done: !item.done })}
       />
-      <span
-        style={{
-          ...ellipsis,
-          flex: 1,
-          minWidth: 0,
-          ...(item.done ? { textDecoration: 'line-through', color: color.sub } : {}),
-        }}
-      >
-        {item.text}
-      </span>
+      {editing ? (
+        <input
+          autoFocus
+          aria-label="메모 고치기"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') commit();
+            else if (e.key === 'Escape') setEditing(false);
+          }}
+          style={{
+            flex: 1,
+            minWidth: 0,
+            background: color.bg,
+            color: color.text,
+            border: `1px solid ${color.blue}`,
+            borderRadius: 6,
+            padding: '2px 6px',
+            fontSize: 13,
+            outline: 'none',
+          }}
+        />
+      ) : (
+        <span
+          title="눌러서 고치기"
+          onClick={startEdit}
+          style={{
+            ...ellipsis,
+            flex: 1,
+            minWidth: 0,
+            cursor: 'text',
+            ...(item.done ? { textDecoration: 'line-through', color: color.sub } : {}),
+          }}
+        >
+          {item.text}
+        </span>
+      )}
       {item.done ? (
         <DoneBadge />
       ) : (

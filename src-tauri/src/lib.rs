@@ -146,7 +146,12 @@ fn try_register_hotkey(app: &AppHandle, hotkey: &str) -> Result<(), String> {
     .map_err(|e| format!("이미 사용 중인 키입니다. 설정에서 다른 키를 골라 주세요 ({hotkey}: {e})"))
 }
 
+/// 기본 단축키(Win+J)를 윈도우나 다른 프로그램이 이미 쓰고 있을 때 대신 시도해 볼 키들.
+const FALLBACK_HOTKEYS: [&str; 2] = ["Alt+Backquote", "Ctrl+Alt+J"];
+const DEFAULT_HOTKEY: &str = "Super+J";
+
 /// 설정의 단축키를 등록한다. 실패하면 이유를 보관하고 `hotkey-failed`를 알린다.
+/// 기본 키(Win+J)가 막혀 있으면 대체 키를 찾아 자동으로 바꾼다.
 fn register_hotkey(app: &AppHandle) {
     let hotkey = app.state::<AppState>().settings.lock().unwrap().hotkey.clone();
     let result = try_register_hotkey(app, &hotkey);
@@ -154,6 +159,23 @@ fn register_hotkey(app: &AppHandle) {
     match result {
         Ok(()) => *state.hotkey_error.lock().unwrap() = None,
         Err(msg) => {
+            if hotkey == DEFAULT_HOTKEY {
+                for fb in FALLBACK_HOTKEYS {
+                    if try_register_hotkey(app, fb).is_ok() {
+                        let notice = format!("Win+J는 윈도우가 이미 쓰고 있어 {fb} 키로 바꿨습니다. 설정에서 다른 키로 바꿀 수 있습니다.");
+                        let updated = {
+                            let mut s = state.settings.lock().unwrap();
+                            s.hotkey = fb.to_string();
+                            s.clone()
+                        };
+                        let _ = save_settings_file(&state.settings_file, &updated);
+                        *state.hotkey_error.lock().unwrap() = Some(notice.clone());
+                        let _ = app.emit("hotkey-failed", notice);
+                        let _ = app.emit("settings-changed", ());
+                        return;
+                    }
+                }
+            }
             *state.hotkey_error.lock().unwrap() = Some(msg.clone());
             let _ = app.emit("hotkey-failed", msg);
         }

@@ -8,7 +8,7 @@ export function formatHotkey(tauriKey: string): string {
 
 const MODIFIER_CODES = /^(Control|Shift|Alt|Meta|OS)(Left|Right)?$/;
 /** 윈도우 자체가 쓰는 Win 조합. 등록해도 우리 앱에 오지 않는다. */
-const WINDOWS_RESERVED = new Set(['D', 'E', 'L', 'M', 'R', 'Tab']);
+const WINDOWS_RESERVED = new Set(['D', 'E', 'L', 'M', 'R', 'Tab', 'J']);
 
 export type CaptureResult =
   | { kind: 'ignore' }

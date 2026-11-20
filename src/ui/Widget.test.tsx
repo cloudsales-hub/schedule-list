@@ -224,6 +224,43 @@ describe('Widget', () => {
     expect(rows.findIndex((t) => t?.includes('남은 일'))).toBeLessThan(rows.findIndex((t) => t?.includes('전화 회신')));
   });
 
+  test('메모 글자를 누르면 그 자리에서 고치고 Enter로 저장한다', async () => {
+    const it = item({ text: '견적서 보내기', due: '2026-11-25T00:00' });
+    const { store, onOpenDashboard } = setup([it]);
+    const user = userEvent.setup();
+    await user.click(screen.getByText('견적서 보내기'));
+    const box = screen.getByRole('textbox', { name: '메모 고치기' });
+    expect(box).toHaveValue('견적서 보내기');
+    await user.clear(box);
+    await user.type(box, '견적서 수정해서 보내기{Enter}');
+    expect(store.update).toHaveBeenCalledWith(it.id, { text: '견적서 수정해서 보내기' });
+    expect(onOpenDashboard).not.toHaveBeenCalled();
+    expect(screen.queryByRole('textbox', { name: '메모 고치기' })).toBeNull();
+  });
+
+  test('고치다가 Esc를 누르거나 비워 두면 저장하지 않는다', async () => {
+    const it = item({ text: '원래 글' });
+    const { store } = setup([it]);
+    const user = userEvent.setup();
+    await user.click(screen.getByText('원래 글'));
+    await user.type(screen.getByRole('textbox', { name: '메모 고치기' }), ' 추가{Escape}');
+    expect(store.update).not.toHaveBeenCalled();
+    expect(screen.getByText('원래 글')).toBeInTheDocument();
+    await user.click(screen.getByText('원래 글'));
+    await user.clear(screen.getByRole('textbox', { name: '메모 고치기' }));
+    await user.keyboard('{Enter}');
+    expect(store.update).not.toHaveBeenCalled();
+  });
+
+  test('글을 바꾸지 않고 Enter를 눌러도 저장 요청을 보내지 않는다', async () => {
+    const it = item({ text: '그대로' });
+    const { store } = setup([it]);
+    const user = userEvent.setup();
+    await user.click(screen.getByText('그대로'));
+    await user.keyboard('{Enter}');
+    expect(store.update).not.toHaveBeenCalled();
+  });
+
   test('저장소 오류 문구를 위쪽에 보여 준다', () => {
     setup([], { status: 'error', error: '데이터 파일을 저장하지 못했습니다: disk full' });
     expect(screen.getByRole('alert')).toHaveTextContent('데이터 파일을 저장하지 못했습니다: disk full');
