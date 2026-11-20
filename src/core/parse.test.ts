@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { parseMemo } from './parse';
+import { parseMemo, splitMemoLines } from './parse';
 
 // 2026-11-20은 금요일이다.
 const now = new Date('2026-11-20T09:00');
@@ -113,5 +113,22 @@ describe('parseMemo: 애매하거나 이상한 입력 (Review Focus 1)', () => {
   test('없는 날짜 "13월 5일"은 무시', () => {
     const r = parseMemo('13월 5일 회의', now)!;
     expect(r.due).toBeNull();
+  });
+});
+
+describe('splitMemoLines', () => {
+  test('줄마다 하나의 메모로 나누고 빈 줄은 버린다', () => {
+    expect(splitMemoLines('이즐 - 부산 계약서\r\n\r\n  옴니콘 메일 회신 + 견적  \n나인와트 메일\n')).toEqual([
+      '이즐 - 부산 계약서',
+      '옴니콘 메일 회신 + 견적',
+      '나인와트 메일',
+    ]);
+  });
+  test('목록 기호와 번호는 떼어 낸다', () => {
+    expect(splitMemoLines('- 가\n• 나\n* 다\n1. 라\n2) 마\n-하이픈 없는 것')).toEqual(['가', '나', '다', '라', '마', '-하이픈 없는 것']);
+  });
+  test('한 줄이거나 비어 있으면 한 개 또는 0개', () => {
+    expect(splitMemoLines('한 줄\n')).toEqual(['한 줄']);
+    expect(splitMemoLines(' \n \n')).toEqual([]);
   });
 });

@@ -142,3 +142,13 @@ export function parseMemo(input: string, now: Date): ParsedMemo | null {
     label: `${dayLabel} ${timeLabel(time)}`,
   };
 }
+
+const LIST_MARKER = /^\s*(?:[-*•·▪]|\d+[.)])\s+/;
+
+/** 여러 줄 글을 메모 한 개씩으로 나눈다. 빈 줄은 버리고 앞의 목록 기호(-, •, 1.)는 뗀다. */
+export function splitMemoLines(text: string): string[] {
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.replace(LIST_MARKER, '').trim())
+    .filter((line) => line !== '');
+}
