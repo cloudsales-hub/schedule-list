@@ -23,7 +23,8 @@
         "alwaysOnBottom": true,
         "resizable": true,
         "shadow": false,
-        "focus": false
+        "focus": false,
+        "create": false
       },
       {
         "label": "quick",
@@ -38,7 +39,8 @@
         "alwaysOnTop": true,
         "resizable": false,
         "shadow": true,
-        "visible": false
+        "visible": false,
+        "create": false
       },
       {
         "label": "dashboard",
@@ -49,7 +51,8 @@
         "center": true,
         "visible": false,
         "minWidth": 700,
-        "minHeight": 480
+        "minHeight": 480,
+        "create": false
       }
     ],
     "security": {

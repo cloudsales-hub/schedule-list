@@ -294,6 +294,10 @@ pub fn run() {
                 app_data,
                 settings_file,
             });
+            // 창은 상태를 등록한 뒤에 만든다. 먼저 뜨면 화면이 명령을 부를 때 상태가 없어 오류가 난다.
+            for cfg in app.config().app.windows.iter() {
+                tauri::WebviewWindowBuilder::from_config(app.handle(), cfg)?.build()?;
+            }
             restart_watcher(app.handle());
             register_hotkey(app.handle());
             let autostart = app.state::<AppState>().settings.lock().unwrap().autostart;
