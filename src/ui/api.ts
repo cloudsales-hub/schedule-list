@@ -109,3 +109,8 @@ export function onSettingsChanged(cb: () => void): () => void {
     unlisten?.();
   };
 }
+
+/** 위젯을 맨 앞으로 올린다. 다른 창을 누르면 다시 바탕화면 쪽으로 내려간다. */
+export function raiseWidget(): void {
+  void invoke('raise_widget').catch(() => {});
+}

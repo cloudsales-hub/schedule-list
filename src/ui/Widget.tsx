@@ -14,6 +14,8 @@ interface Props {
   hotkeyLabel: string;
   /** 단축키 등록 실패 같은 안내 문구 */
   notice?: string | null;
+  /** 위젯을 눌렀을 때 다른 창 뒤에 가려져 있으면 맨 앞으로 올려 달라는 요청 */
+  onRaise?(): void;
   onOpenQuick(): void;
   onOpenDashboard(): void;
 }
@@ -118,7 +120,7 @@ function Row({ item, store, now }: { item: Item; store: ItemsStore; now: Date })
   );
 }
 
-export function Widget({ store, hotkeyLabel, notice, onOpenQuick, onOpenDashboard }: Props) {
+export function Widget({ store, hotkeyLabel, notice, onRaise, onOpenQuick, onOpenDashboard }: Props) {
   useStore(store);
   const now = useNow();
   const urgent = urgentTasks(store.items, now);
@@ -131,6 +133,7 @@ export function Widget({ store, hotkeyLabel, notice, onOpenQuick, onOpenDashboar
   return (
     <div
       data-testid="widget-root"
+      onMouseDown={() => onRaise?.()}
       style={{
         boxSizing: 'border-box',
         padding: 14,

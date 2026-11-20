@@ -37,13 +37,13 @@ function fakeStore(items: Item[], extra: Partial<{ status: string; error: string
   return store as unknown as ItemsStore & { add: ReturnType<typeof vi.fn>; update: ReturnType<typeof vi.fn> };
 }
 
-function setup(items: Item[], extra = {}) {
+function setup(items: Item[], extra = {}, onRaise: () => void = () => {}) {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(NOW);
   const store = fakeStore(items, extra);
   const onOpenQuick = vi.fn();
   const onOpenDashboard = vi.fn();
-  render(<Widget store={store} hotkeyLabel="Win+J" onOpenQuick={onOpenQuick} onOpenDashboard={onOpenDashboard} />);
+  render(<Widget store={store} hotkeyLabel="Win+J" onRaise={onRaise} onOpenQuick={onOpenQuick} onOpenDashboard={onOpenDashboard} />);
   return { store, onOpenQuick, onOpenDashboard };
 }
 
@@ -259,6 +259,14 @@ describe('Widget', () => {
     await user.click(screen.getByText('그대로'));
     await user.keyboard('{Enter}');
     expect(store.update).not.toHaveBeenCalled();
+  });
+
+  test('위젯의 아무 곳이나 누르면 맨 앞으로 올려 달라고 요청한다', () => {
+    const onRaise = vi.fn();
+    setup([item({ text: '견적서' })], {}, onRaise);
+    fireEvent.mouseDown(screen.getByText('견적서'));
+    fireEvent.mouseDown(screen.getByTestId('drag-handle'));
+    expect(onRaise).toHaveBeenCalledTimes(2);
   });
 
   test('저장소 오류 문구를 위쪽에 보여 준다', () => {

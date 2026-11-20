@@ -196,7 +196,14 @@ fn show_window(app: AppHandle, label: String) -> Result<(), String> {
     win.set_focus().map_err(|e| e.to_string())
 }
 
-/// 위젯을 10초간 맨 앞으로 올렸다가 다시 바탕화면 위치(맨 아래)로 내린다.
+/// 위젯을 바탕화면 쪽(다른 창 아래)으로 내린다.
+fn lower_widget(win: &tauri::WebviewWindow) {
+    let _ = win.set_always_on_top(false);
+    let _ = win.set_always_on_bottom(true);
+}
+
+/// 위젯을 맨 앞으로 올린다. 위젯 밖을 누르면(포커스를 잃으면) 다시 아래로 내려가고,
+/// 포커스를 못 얻은 경우에도 10초 뒤에는 내려간다.
 /// 숨겨져 있거나 화면 밖에 있어도 보이는 자리로 가져온다.
 fn peek_widget(app: &AppHandle) {
     let Some(win) = app.get_webview_window("widget") else { return };
@@ -208,9 +215,15 @@ fn peek_widget(app: &AppHandle) {
     let _ = win.set_focus();
     std::thread::spawn(move || {
         std::thread::sleep(Duration::from_secs(10));
-        let _ = win.set_always_on_top(false);
-        let _ = win.set_always_on_bottom(true);
+        if !win.is_focused().unwrap_or(false) {
+            lower_widget(&win);
+        }
     });
+}
+
+#[tauri::command]
+fn raise_widget(app: AppHandle) {
+    peek_widget(&app);
 }
 
 /// 위젯을 화면 오른쪽 위로 옮긴다.
@@ -373,6 +386,12 @@ pub fn run() {
         // 대시보드를 닫아도 앱은 계속 실행한다. 숨기기만 한다.
         .on_window_event(|window, event| {
             // 위젯을 끌어 옮기거나 크기를 바꾸면 바로 저장해 두어, 껐다 켜도 같은 자리에 뜬다.
+            // 위젯 밖을 눌러 포커스를 잃으면 다시 다른 창 아래로 내린다.
+            if let (true, WindowEvent::Focused(false)) = (window.label() == "widget", event) {
+                if let Some(w) = window.app_handle().get_webview_window("widget") {
+                    lower_widget(&w);
+                }
+            }
             if window.label() == "widget" && matches!(event, WindowEvent::Moved(_) | WindowEvent::Resized(_)) {
                 let _ = window.app_handle().save_window_state(StateFlags::all());
             }
@@ -391,6 +410,7 @@ pub fn run() {
             save_settings,
             show_window,
             get_hotkey_error,
+            raise_widget,
             suggested_data_dir
         ])
         .run(tauri::generate_context!())

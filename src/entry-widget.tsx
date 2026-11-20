@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
 import './ui/scrollbar.css';
 import { ItemsStore } from './core/store';
-import { getHotkeyError, getSettings, onHotkeyFailed, onSettingsChanged, showWindow, tauriBackend } from './ui/api';
+import { getHotkeyError, getSettings, onHotkeyFailed, onSettingsChanged, raiseWidget, showWindow, tauriBackend } from './ui/api';
 import { formatHotkey } from './ui/hotkey';
 import { Widget } from './ui/Widget';
 
@@ -34,6 +34,7 @@ function App() {
       store={store}
       hotkeyLabel={hotkey}
       notice={notice}
+      onRaise={raiseWidget}
       onOpenQuick={() => void showWindow('quick')}
       onOpenDashboard={() => void showWindow('dashboard')}
     />
