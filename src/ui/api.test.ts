@@ -66,7 +66,7 @@ describe('tauriBackend', () => {
 
 describe('설정', () => {
   const settings: Settings = {
-    hotkey: 'Super+J',
+    hotkey: 'Alt+Backquote',
     dataDir: null,
     autostart: true,
     bannerPath: null,

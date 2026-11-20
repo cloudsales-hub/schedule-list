@@ -43,7 +43,7 @@ function setup(items: Item[], extra = {}, onRaise: () => void = () => {}) {
   const store = fakeStore(items, extra);
   const onOpenQuick = vi.fn();
   const onOpenDashboard = vi.fn();
-  render(<Widget store={store} hotkeyLabel="Win+J" onRaise={onRaise} onOpenQuick={onOpenQuick} onOpenDashboard={onOpenDashboard} />);
+  render(<Widget store={store} hotkeyLabel="Alt+~" onRaise={onRaise} onOpenQuick={onOpenQuick} onOpenDashboard={onOpenDashboard} />);
   return { store, onOpenQuick, onOpenDashboard };
 }
 
@@ -84,7 +84,7 @@ describe('Widget', () => {
   test('＋ 메모 버튼에 단축키가 보이고 누르면 빠른 입력을 연다', async () => {
     const { onOpenQuick, onOpenDashboard } = setup([]);
     const btn = screen.getByRole('button', { name: /메모/ });
-    expect(btn).toHaveTextContent('Win+J');
+    expect(btn).toHaveTextContent('Alt+~');
     fireEvent.click(btn);
     expect(onOpenQuick).toHaveBeenCalledTimes(1);
     expect(onOpenDashboard).not.toHaveBeenCalled();
@@ -132,7 +132,7 @@ describe('Widget', () => {
     vi.setSystemTime(NOW);
     const store = fakeStore([]);
     const onOpenDashboard = vi.fn();
-    render(<Widget store={store} hotkeyLabel="Win+J" onOpenQuick={() => {}} onOpenDashboard={onOpenDashboard} />);
+    render(<Widget store={store} hotkeyLabel="Alt+~" onOpenQuick={() => {}} onOpenDashboard={onOpenDashboard} />);
     const user = userEvent.setup();
     await user.type(screen.getByRole('textbox'), '내일 오전까지 견적서');
     await user.keyboard('{Enter}');
@@ -153,7 +153,7 @@ describe('Widget', () => {
       item({ text: '내일마감', due: '2026-11-21T00:00' }),
       item({ text: '오늘마감', due: '2026-11-20T00:00' }),
     ]);
-    render(<Widget store={store} hotkeyLabel="Win+J" onOpenQuick={() => {}} onOpenDashboard={() => {}} />);
+    render(<Widget store={store} hotkeyLabel="Alt+~" onOpenQuick={() => {}} onOpenDashboard={() => {}} />);
     const row = (t: string) => screen.getByText(t).closest('[data-testid="row"]') as HTMLElement;
     expect(within(row('내일마감')).getByText('내일')).toBeInTheDocument();
     expect(within(row('오늘마감')).getByText('오늘')).toHaveAttribute('data-overdue', 'false');
@@ -184,7 +184,7 @@ describe('Widget', () => {
     render(
       <Widget
         store={fakeStore([])}
-        hotkeyLabel="Win+J"
+        hotkeyLabel="Alt+~"
         notice="이미 사용 중인 키입니다. 설정에서 다른 키를 골라 주세요"
         onOpenQuick={() => {}}
         onOpenDashboard={() => {}}

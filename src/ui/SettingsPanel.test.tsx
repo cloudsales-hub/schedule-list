@@ -5,7 +5,7 @@ import type { Settings } from './api';
 import { SettingsPanel, formatHotkey } from './SettingsPanel';
 
 const base: Settings = {
-  hotkey: 'Super+J',
+  hotkey: 'Alt+Backquote',
   dataDir: 'C:\\Users\\me\\OneDrive\\일정위젯',
   autostart: true,
   bannerPath: null,
@@ -32,7 +32,7 @@ function setup(over: Partial<Settings> = {}, props: { hotkeyError?: string | nul
 describe('formatHotkey', () => {
   test('화면용 표기로 바꾼다', () => {
     expect(formatHotkey('Super+J')).toBe('Win+J');
-    expect(formatHotkey('Alt+Backquote')).toBe('Alt+₩');
+    expect(formatHotkey('Alt+Backquote')).toBe('Alt+~');
     expect(formatHotkey('Ctrl+Shift+Z')).toBe('Ctrl+Shift+Z');
   });
 });
@@ -41,7 +41,7 @@ describe('SettingsPanel', () => {
   test('키 조합을 누르면 단축키가 바뀐다', () => {
     const { onSave, settings } = setup();
     const box = screen.getByLabelText('단축키');
-    expect(box).toHaveValue('Win+J');
+    expect(box).toHaveValue('Alt+~');
     fireEvent.keyDown(box, { key: 'z', code: 'KeyZ', altKey: true });
     expect(onSave).toHaveBeenCalledWith({ ...settings, hotkey: 'Alt+Z' });
   });

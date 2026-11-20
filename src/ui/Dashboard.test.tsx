@@ -25,7 +25,7 @@ function item(p: Partial<Item>): Item {
   };
 }
 
-const settings: Settings = { hotkey: 'Super+J', dataDir: null, autostart: true, bannerPath: null, bannerHeight: 320 };
+const settings: Settings = { hotkey: 'Alt+Backquote', dataDir: null, autostart: true, bannerPath: null, bannerHeight: 320 };
 
 function fakeStore(items: Item[]) {
   return {

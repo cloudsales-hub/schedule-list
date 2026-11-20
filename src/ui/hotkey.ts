@@ -1,8 +1,8 @@
-/** 화면에 보이는 표기. 'Super+J' → 'Win+J', 'Alt+Backquote' → 'Alt+₩' */
+/** 화면에 보이는 표기. 'Super+J' → 'Win+J', 'Alt+Backquote' → 'Alt+~' */
 export function formatHotkey(tauriKey: string): string {
   return tauriKey
     .split('+')
-    .map((p) => (p === 'Super' ? 'Win' : p === 'Backquote' ? '₩' : p))
+    .map((p) => (p === 'Super' ? 'Win' : p === 'Backquote' ? '~' : p))
     .join('+');
 }
 

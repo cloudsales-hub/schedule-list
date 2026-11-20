@@ -17,7 +17,7 @@ import { Dashboard } from './ui/Dashboard';
 import { SettingsPanel } from './ui/SettingsPanel';
 import { color } from './ui/styles';
 
-const DEFAULT_SETTINGS: Settings = { hotkey: 'Super+J', dataDir: null, autostart: true, bannerPath: null, bannerHeight: 320 };
+const DEFAULT_SETTINGS: Settings = { hotkey: 'Alt+Backquote', dataDir: null, autostart: true, bannerPath: null, bannerHeight: 320 };
 
 function App() {
   const store = useMemo(() => new ItemsStore(tauriBackend()), []);

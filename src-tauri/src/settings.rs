@@ -4,7 +4,9 @@ use serde::{Deserialize, Serialize};
 use std::io;
 use std::path::{Path, PathBuf};
 
-const DEFAULT_HOTKEY: &str = "Super+J";
+const DEFAULT_HOTKEY: &str = "Alt+Backquote";
+/// 예전 버전의 기본 키. 윈도우가 먼저 가져가 동작하지 않아 새 기본 키로 바꾼다.
+const OLD_DEFAULT_HOTKEY: &str = "Super+J";
 const DEFAULT_BANNER_HEIGHT: u32 = 320;
 const ALLOWED_BANNER_HEIGHTS: [u32; 3] = [160, 240, 320];
 const DATA_FILE_NAME: &str = "schedule-data.json";
@@ -13,7 +15,7 @@ const ONEDRIVE_SUBFOLDER: &str = "일정위젯";
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Settings {
-    /// Tauri 표기. 예: "Super+J" (화면에는 "Win+J"로 보인다)
+    /// Tauri 표기. 예: "Alt+Backquote" (화면에는 "Alt+~"로 보인다)
     pub hotkey: String,
     pub data_dir: Option<String>,
     pub autostart: bool,
@@ -41,7 +43,7 @@ impl Settings {
         if !ALLOWED_BANNER_HEIGHTS.contains(&self.banner_height) {
             self.banner_height = DEFAULT_BANNER_HEIGHT;
         }
-        if self.hotkey.trim().is_empty() {
+        if self.hotkey.trim().is_empty() || self.hotkey == OLD_DEFAULT_HOTKEY {
             self.hotkey = DEFAULT_HOTKEY.to_string();
         }
         self
@@ -92,7 +94,7 @@ mod tests {
     #[test]
     fn 기본값() {
         let s = Settings::default();
-        assert_eq!(s.hotkey, "Super+J");
+        assert_eq!(s.hotkey, "Alt+Backquote");
         assert_eq!(s.data_dir, None);
         assert!(s.autostart);
         assert_eq!(s.banner_path, None);
@@ -128,7 +130,23 @@ mod tests {
     #[test]
     fn 빈_단축키는_기본값으로_바로잡는다() {
         let s = Settings { hotkey: "  ".into(), ..Settings::default() }.normalized();
-        assert_eq!(s.hotkey, "Super+J");
+        assert_eq!(s.hotkey, "Alt+Backquote");
+    }
+
+    #[test]
+    fn 예전_기본_키_win_j는_새_기본_키로_바꾼다() {
+        let s = Settings { hotkey: "Super+J".into(), ..Settings::default() }.normalized();
+        assert_eq!(s.hotkey, "Alt+Backquote");
+        let kept = Settings { hotkey: "Ctrl+Alt+J".into(), ..Settings::default() }.normalized();
+        assert_eq!(kept.hotkey, "Ctrl+Alt+J");
+    }
+
+    #[test]
+    fn 저장돼_있던_win_j_설정도_읽을_때_바뀐다() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        fs::write(&path, "{\"hotkey\":\"Super+J\"}").unwrap();
+        assert_eq!(load_settings_file(&path).hotkey, "Alt+Backquote");
     }
 
     #[test]

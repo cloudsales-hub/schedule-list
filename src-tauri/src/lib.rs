@@ -146,12 +146,12 @@ fn try_register_hotkey(app: &AppHandle, hotkey: &str) -> Result<(), String> {
     .map_err(|e| format!("이미 사용 중인 키입니다. 설정에서 다른 키를 골라 주세요 ({hotkey}: {e})"))
 }
 
-/// 기본 단축키(Win+J)를 윈도우나 다른 프로그램이 이미 쓰고 있을 때 대신 시도해 볼 키들.
-const FALLBACK_HOTKEYS: [&str; 2] = ["Alt+Backquote", "Ctrl+Alt+J"];
-const DEFAULT_HOTKEY: &str = "Super+J";
+/// 기본 단축키(Alt+~)를 다른 프로그램이 이미 쓰고 있을 때 대신 시도해 볼 키들.
+const FALLBACK_HOTKEYS: [&str; 2] = ["Ctrl+Alt+J", "Ctrl+Alt+M"];
+const DEFAULT_HOTKEY: &str = "Alt+Backquote";
 
 /// 설정의 단축키를 등록한다. 실패하면 이유를 보관하고 `hotkey-failed`를 알린다.
-/// 기본 키(Win+J)가 막혀 있으면 대체 키를 찾아 자동으로 바꾼다.
+/// 기본 키(Alt+~)가 막혀 있으면 대체 키를 찾아 자동으로 바꾼다.
 fn register_hotkey(app: &AppHandle) {
     let hotkey = app.state::<AppState>().settings.lock().unwrap().hotkey.clone();
     let result = try_register_hotkey(app, &hotkey);
@@ -162,7 +162,7 @@ fn register_hotkey(app: &AppHandle) {
             if hotkey == DEFAULT_HOTKEY {
                 for fb in FALLBACK_HOTKEYS {
                     if try_register_hotkey(app, fb).is_ok() {
-                        let notice = format!("Win+J는 윈도우가 이미 쓰고 있어 {fb} 키로 바꿨습니다. 설정에서 다른 키로 바꿀 수 있습니다.");
+                        let notice = format!("Alt+~를 다른 프로그램이 이미 쓰고 있어 {fb} 키로 바꿨습니다. 설정에서 다른 키로 바꿀 수 있습니다.");
                         let updated = {
                             let mut s = state.settings.lock().unwrap();
                             s.hotkey = fb.to_string();
@@ -196,6 +196,16 @@ fn show_window(app: AppHandle, label: String) -> Result<(), String> {
     win.set_focus().map_err(|e| e.to_string())
 }
 
+/// 위젯이 포커스를 잃었을 때 아래로 내릴지. 빠른 메모창이 떠서 포커스가 넘어간 경우에는
+/// 위젯의 위치(맨 위든 바탕화면이든)를 그대로 둔다.
+fn should_lower_on_blur(quick_visible: bool) -> bool {
+    !quick_visible
+}
+
+fn quick_is_visible(app: &AppHandle) -> bool {
+    app.get_webview_window("quick").and_then(|w| w.is_visible().ok()).unwrap_or(false)
+}
+
 /// 위젯을 바탕화면 쪽(다른 창 아래)으로 내린다.
 fn lower_widget(win: &tauri::WebviewWindow) {
     let _ = win.set_always_on_top(false);
@@ -215,7 +225,7 @@ fn peek_widget(app: &AppHandle) {
     let _ = win.set_focus();
     std::thread::spawn(move || {
         std::thread::sleep(Duration::from_secs(10));
-        if !win.is_focused().unwrap_or(false) {
+        if !win.is_focused().unwrap_or(false) && should_lower_on_blur(quick_is_visible(win.app_handle())) {
             lower_widget(&win);
         }
     });
@@ -388,8 +398,10 @@ pub fn run() {
             // 위젯을 끌어 옮기거나 크기를 바꾸면 바로 저장해 두어, 껐다 켜도 같은 자리에 뜬다.
             // 위젯 밖을 눌러 포커스를 잃으면 다시 다른 창 아래로 내린다.
             if let (true, WindowEvent::Focused(false)) = (window.label() == "widget", event) {
-                if let Some(w) = window.app_handle().get_webview_window("widget") {
-                    lower_widget(&w);
+                if should_lower_on_blur(quick_is_visible(window.app_handle())) {
+                    if let Some(w) = window.app_handle().get_webview_window("widget") {
+                        lower_widget(&w);
+                    }
                 }
             }
             if window.label() == "widget" && matches!(event, WindowEvent::Moved(_) | WindowEvent::Resized(_)) {
@@ -415,4 +427,19 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("앱을 실행하지 못했습니다");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::should_lower_on_blur;
+
+    #[test]
+    fn 빠른_메모창이_떠_있으면_위젯_위치를_바꾸지_않는다() {
+        assert!(!should_lower_on_blur(true));
+    }
+
+    #[test]
+    fn 다른_곳을_눌러_포커스를_잃으면_바탕화면_쪽으로_내린다() {
+        assert!(should_lower_on_blur(false));
+    }
 }
