@@ -206,6 +206,24 @@ describe('Widget', () => {
     expect(root.style.minHeight).toBe('');
   });
 
+  test('오늘 완료한 항목은 사라지지 않고 완료 표시와 함께 남는다', () => {
+    const done = item({ text: '전화 회신', done: true, updatedAt: new Date('2026-11-20T08:00').getTime() });
+    const yesterday = item({ text: '어제 끝낸 일', done: true, updatedAt: new Date('2026-11-19T10:00').getTime() });
+    const open = item({ text: '남은 일' });
+    const { store } = setup([open, done, yesterday]);
+    expect(screen.getByText(/할일 \(1\)/)).toBeInTheDocument();
+    expect(screen.queryByText('어제 끝낸 일')).toBeNull();
+    const row = screen.getByText('전화 회신').closest('[data-testid="row"]') as HTMLElement;
+    expect(within(row).getByText('완료')).toBeInTheDocument();
+    expect(screen.getByText('전화 회신')).toHaveStyle({ textDecoration: 'line-through' });
+    const box = within(row).getByRole('checkbox');
+    expect(box).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(box);
+    expect(store.update).toHaveBeenCalledWith(done.id, { done: false });
+    const rows = screen.getAllByTestId('row').map((r) => r.textContent);
+    expect(rows.findIndex((t) => t?.includes('남은 일'))).toBeLessThan(rows.findIndex((t) => t?.includes('전화 회신')));
+  });
+
   test('저장소 오류 문구를 위쪽에 보여 준다', () => {
     setup([], { status: 'error', error: '데이터 파일을 저장하지 못했습니다: disk full' });
     expect(screen.getByRole('alert')).toHaveTextContent('데이터 파일을 저장하지 못했습니다: disk full');

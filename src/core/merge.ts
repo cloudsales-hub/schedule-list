@@ -51,8 +51,9 @@ export function mergeItems(a: Item[], b: Item[]): Item[] {
   return [...byId.values()];
 }
 
-/** 삭제 표시(deleted)된 지 days일(기본 30)이 넘은 항목을 지운다. */
+/** 삭제 표시했거나 완료한 지 days일(기본 30)이 넘은 항목을 지운다. */
 export function purgeDeleted(items: Item[], now: Date, days = 30): Item[] {
   const limit = now.getTime() - days * 86400000;
-  return items.filter((i) => !(i.deleted && i.updatedAt < limit));
+  // 삭제 표시한 항목과 완료한 항목은 days일이 지나면 파일에서 정리한다.
+  return items.filter((i) => !((i.deleted || i.done) && i.updatedAt < limit));
 }

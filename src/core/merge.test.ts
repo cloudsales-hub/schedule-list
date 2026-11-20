@@ -77,6 +77,14 @@ describe('purgeDeleted', () => {
     expect(ids(purgeDeleted(items, now))).toEqual(['alive']);
   });
 
+  test('완료한 지 31일 넘은 항목도 정리하고 29일은 유지', () => {
+    const items = [
+      mk({ id: 'old-done', done: true, updatedAt: now.getTime() - 31 * dayMs }),
+      mk({ id: 'recent-done', done: true, updatedAt: now.getTime() - 29 * dayMs }),
+    ];
+    expect(ids(purgeDeleted(items, now))).toEqual(['recent-done']);
+  });
+
   test('days 인자를 바꿀 수 있다', () => {
     const items = [mk({ id: 'x', deleted: true, updatedAt: now.getTime() - 8 * dayMs })];
     expect(purgeDeleted(items, now, 7)).toHaveLength(0);

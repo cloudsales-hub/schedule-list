@@ -1,7 +1,8 @@
 import type { CSSProperties, MouseEvent } from 'react';
 import type { Item } from '../core/model';
-import { plainTodos, urgentTasks } from '../core/selectors';
+import { doneToday, plainTodos, urgentTasks } from '../core/selectors';
 import type { ItemsStore } from '../core/store';
+import { DoneBadge, DoneToggle } from './DoneToggle';
 import { dueLabel } from './dueLabel';
 import { MemoInput } from './MemoInput';
 import { color, ellipsis, font } from './styles';
@@ -33,21 +34,32 @@ function Row({ item, store, now }: { item: Item; store: ItemsStore; now: Date })
   const label = dueLabel(item, now);
   return (
     <li data-testid="row" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', fontSize: 13 }}>
-      <input
-        type="checkbox"
-        checked={false}
-        aria-label={`${item.text} 완료`}
-        onClick={stop}
-        onChange={() => void store.update(item.id, { done: true })}
+      <DoneToggle
+        done={item.done}
+        label={`${item.text} ${item.done ? '완료 취소' : '완료'}`}
+        onToggle={() => void store.update(item.id, { done: !item.done })}
       />
-      <span style={{ ...ellipsis, flex: 1, minWidth: 0 }}>{item.text}</span>
-      {label && (
+      <span
+        style={{
+          ...ellipsis,
+          flex: 1,
+          minWidth: 0,
+          ...(item.done ? { textDecoration: 'line-through', color: color.sub } : {}),
+        }}
+      >
+        {item.text}
+      </span>
+      {item.done ? (
+        <DoneBadge />
+      ) : (
+        label && (
         <span
           data-overdue={String(label.overdue)}
           style={{ fontSize: 11, flexShrink: 0, color: label.overdue ? color.red : color.sub }}
         >
           {label.text}
         </span>
+        )
       )}
       <button
         aria-label="삭제"
@@ -69,6 +81,10 @@ export function Widget({ store, hotkeyLabel, notice, onOpenQuick, onOpenDashboar
   const now = useNow();
   const urgent = urgentTasks(store.items, now);
   const todos = plainTodos(store.items);
+  // 오늘 완료한 항목은 각 목록 맨 아래에 남긴다(자정이 지나면 사라진다).
+  const doneTasks = doneToday(store.items, now).filter((i) => i.kind === 'task');
+  const urgentShown = [...urgent, ...doneTasks.filter((i) => i.due !== null)];
+  const todosShown = [...todos, ...doneTasks.filter((i) => i.due === null)];
 
   return (
     <div
@@ -129,14 +145,14 @@ export function Widget({ store, hotkeyLabel, notice, onOpenQuick, onOpenDashboar
 
       <h3 style={{ fontSize: 12, color: color.sub, margin: '8px 0 4px' }}>🔥 급한 것</h3>
       <ul data-testid="urgent-list" style={listStyle}>
-        {urgent.map((it) => (
+        {urgentShown.map((it) => (
           <Row key={it.id} item={it} store={store} now={now} />
         ))}
       </ul>
 
       <h3 style={{ fontSize: 12, color: color.sub, margin: '12px 0 4px' }}>📝 할일 ({todos.length})</h3>
       <ul data-testid="todo-list" style={{ ...listStyle, maxHeight: 220 }}>
-        {todos.map((it) => (
+        {todosShown.map((it) => (
           <Row key={it.id} item={it} store={store} now={now} />
         ))}
       </ul>

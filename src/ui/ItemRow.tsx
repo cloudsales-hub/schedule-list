@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Item, ItemKind, ItemPatch } from '../core/model';
 import type { ItemsStore } from '../core/store';
+import { DoneBadge, DoneToggle } from './DoneToggle';
 import { dueLabel } from './dueLabel';
 import { color, ellipsis } from './styles';
 
@@ -84,9 +85,19 @@ export function ItemRow({ item, store, now, showWhen }: Props) {
   return (
     <li data-testid="row" style={{ fontSize: 13, borderBottom: `1px solid ${color.line}` }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
-        <input type="checkbox" checked={false} aria-label={`${item.text} 완료`} onChange={() => void store.update(item.id, { done: true })} />
-        <span style={{ ...ellipsis, flex: 1, minWidth: 0 }}>{item.text}</span>
-        {showWhen ? (
+        <DoneToggle
+          done={item.done}
+          label={`${item.text} ${item.done ? '완료 취소' : '완료'}`}
+          onToggle={() => void store.update(item.id, { done: !item.done })}
+        />
+        <span
+          style={{ ...ellipsis, flex: 1, minWidth: 0, ...(item.done ? { textDecoration: 'line-through', color: color.sub } : {}) }}
+        >
+          {item.text}
+        </span>
+        {item.done ? (
+          <DoneBadge />
+        ) : showWhen ? (
           <span style={{ fontSize: 11, color: color.sub, flexShrink: 0 }}>{eventWhen(item)}</span>
         ) : (
           label && (

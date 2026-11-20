@@ -111,6 +111,19 @@ describe('Dashboard', () => {
     expect(store.remove).toHaveBeenCalledWith(it.id);
   });
 
+  test('오늘 완료한 항목은 카드 안에 완료 표시로 남고 눌러서 되돌릴 수 있다', () => {
+    const t = new Date('2026-11-20T08:00').getTime();
+    const doneTodo = item({ text: '책 반납', done: true, updatedAt: t });
+    const doneEvent = item({ text: '팀 회의', kind: 'event', due: '2026-11-20T08:30', hasTime: true, done: true, updatedAt: t });
+    const { store } = setup([doneTodo, doneEvent]);
+    const todoRow = within(card('card-todos')).getByText('책 반납').closest('[data-testid="row"]') as HTMLElement;
+    expect(within(todoRow).getByText('완료')).toBeInTheDocument();
+    expect(within(card('card-events')).getByText('팀 회의')).toBeInTheDocument();
+    fireEvent.click(within(todoRow).getByRole('checkbox'));
+    expect(store.update).toHaveBeenCalledWith(doneTodo.id, { done: false });
+    expect(screen.getByRole('heading', { name: /할일 \(0\)/ })).toBeInTheDocument();
+  });
+
   test('수정에서 글자와 종류와 마감을 바꿀 수 있다', async () => {
     const it = item({ text: '회의 준비', due: '2026-11-25T00:00' });
     const { store } = setup([it]);

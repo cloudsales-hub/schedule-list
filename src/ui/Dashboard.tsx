@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { convertFileSrc } from '@tauri-apps/api/core';
-import { markedDays, plainTodos, soonTasks, upcomingEvents } from '../core/selectors';
+import { doneToday, markedDays, plainTodos, soonTasks, upcomingEvents } from '../core/selectors';
 import type { ItemsStore } from '../core/store';
 import bannerDefault from '../assets/banner-room.png';
 import type { Settings } from './api';
@@ -59,9 +59,13 @@ export function Dashboard({ store, settings, onOpenSettings, overlay }: Props) {
       return { year: d.getFullYear(), month: d.getMonth() + 1 };
     });
 
-  const soon = soonTasks(store.items, now);
-  const events = upcomingEvents(store.items, now);
-  const todos = plainTodos(store.items);
+  const doneNow = doneToday(store.items, now);
+  const doneTasks = doneNow.filter((i) => i.kind === 'task');
+  // 오늘 완료한 항목은 각 카드 맨 아래에 완료 표시로 남긴다(자정이 지나면 사라진다).
+  const soon = [...soonTasks(store.items, now), ...doneTasks.filter((i) => i.due !== null)];
+  const events = [...upcomingEvents(store.items, now), ...doneNow.filter((i) => i.kind === 'event')];
+  const todoCount = plainTodos(store.items).length;
+  const todos = [...plainTodos(store.items), ...doneTasks.filter((i) => i.due === null)];
 
   return (
     <div style={{ minHeight: '100vh', background: color.bg, color: color.text, fontFamily: font }}>
@@ -129,7 +133,7 @@ export function Dashboard({ store, settings, onOpenSettings, overlay }: Props) {
             ))}
           </ul>
         </Card>
-        <Card id="card-todos" title={`📝 할일 (${todos.length})`}>
+        <Card id="card-todos" title={`📝 할일 (${todoCount})`}>
           <ul style={listStyle}>
             {todos.map((it) => (
               <ItemRow key={it.id} item={it} store={store} now={now} />

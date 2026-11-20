@@ -45,3 +45,9 @@ export function markedDays(items: Item[], year: number, month: number): Set<numb
   }
   return days;
 }
+
+/** 오늘 0시 이후에 완료한 항목, 완료한 순서. 자정이 지나면 저절로 빠진다. 완료 시각은 수정 시각(updatedAt)을 쓴다. */
+export function doneToday(items: Item[], now: Date): Item[] {
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  return items.filter((i) => i.done && !i.deleted && i.updatedAt >= start).sort((a, b) => a.updatedAt - b.updatedAt);
+}

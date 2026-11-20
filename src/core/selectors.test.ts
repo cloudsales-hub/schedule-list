@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import type { Item } from './model';
 import { createItem, updateItem } from './model';
-import { markedDays, plainTodos, soonTasks, upcomingEvents, urgentTasks } from './selectors';
+import { doneToday, markedDays, plainTodos, soonTasks, upcomingEvents, urgentTasks } from './selectors';
 
 const now = new Date('2026-11-20T09:00');
 
@@ -123,5 +123,23 @@ describe('createItem / updateItem', () => {
     expect(b.updatedAt).toBe(later.getTime());
     expect(b.createdAt).toBe(a.createdAt);
     expect(b.id).toBe(a.id);
+  });
+});
+
+describe('doneToday', () => {
+  const t = (iso: string) => new Date(iso).getTime();
+  test('오늘 0시 이후에 완료한 항목만, 완료한 순서로', () => {
+    const items = [
+      mk({ id: 'late', done: true, updatedAt: t('2026-11-20T08:00') }),
+      mk({ id: 'early', done: true, updatedAt: t('2026-11-20T00:01') }),
+      mk({ id: 'yesterday', done: true, updatedAt: t('2026-11-19T23:59') }),
+      mk({ id: 'gone', done: true, deleted: true, updatedAt: t('2026-11-20T08:30') }),
+      mk({ id: 'open', updatedAt: t('2026-11-20T08:30') }),
+    ];
+    expect(doneToday(items, now).map((i) => i.id)).toEqual(['early', 'late']);
+  });
+  test('자정이 지나면 전날 완료한 것은 사라진다', () => {
+    const items = [mk({ id: 'a', done: true, updatedAt: t('2026-11-20T08:00') })];
+    expect(doneToday(items, new Date('2026-11-21T00:01'))).toEqual([]);
   });
 });
