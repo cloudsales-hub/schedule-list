@@ -25,6 +25,7 @@ function item(p: Partial<Item>): Item {
 
 function fakeStore(items: Item[], extra: Partial<{ status: string; error: string | null }> = {}) {
   const store = {
+    remove: vi.fn().mockResolvedValue(undefined),
     items,
     status: 'ready',
     error: null,
@@ -97,10 +98,26 @@ describe('Widget', () => {
     expect(onOpenDashboard).not.toHaveBeenCalled();
   });
 
+  test('삭제 버튼은 항목을 지우고 대시보드를 열지 않는다', () => {
+    const it = item({ text: '잘못 적은 메모' });
+    const { store, onOpenDashboard } = setup([it]);
+    fireEvent.click(screen.getByRole('button', { name: '삭제' }));
+    expect((store as unknown as { remove: ReturnType<typeof vi.fn> }).remove).toHaveBeenCalledWith(it.id);
+    expect(onOpenDashboard).not.toHaveBeenCalled();
+  });
+
   test('항목 영역을 누르면 대시보드를 연다', () => {
     const { onOpenDashboard } = setup([item({ text: '견적서', due: '2026-11-20T17:00', hasTime: true })]);
     fireEvent.click(screen.getByText('견적서'));
     expect(onOpenDashboard).toHaveBeenCalledTimes(1);
+  });
+
+  test('윗줄(날짜)은 끌어서 옮기는 자리이고 눌러도 대시보드가 열리지 않는다', () => {
+    const { onOpenDashboard } = setup([]);
+    const handle = screen.getByTestId('drag-handle');
+    expect(handle).toHaveAttribute('data-tauri-drag-region');
+    fireEvent.click(handle);
+    expect(onOpenDashboard).not.toHaveBeenCalled();
   });
 
   test('위젯 입력칸에 쓰면 저장하고 대시보드는 열지 않는다', async () => {

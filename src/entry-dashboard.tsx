@@ -30,8 +30,11 @@ function App() {
     Promise.all([getSettings(), suggestedDataDir()]).then(
       ([s, suggested]) => {
         if (!s.dataDir && suggested) {
-          setSettings({ ...s, dataDir: suggested });
+          // 처음 한 번만 설정을 먼저 보여 주고, 추천 폴더를 바로 저장해서 다음부터는 열리지 않게 한다.
+          const filled = { ...s, dataDir: suggested };
+          setSettings(filled);
           setShowSettings(true);
+          void saveSettings(filled).then(() => store.load(), () => {});
         } else {
           setSettings(s);
         }

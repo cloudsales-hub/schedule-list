@@ -42,6 +42,17 @@ function Row({ item, store, now }: { item: Item; store: ItemsStore; now: Date })
           {label.text}
         </span>
       )}
+      <button
+        aria-label="삭제"
+        title="삭제"
+        onClick={(e) => {
+          stop(e);
+          void store.remove(item.id);
+        }}
+        style={{ background: 'transparent', border: 'none', color: color.sub, cursor: 'pointer', fontSize: 12, padding: 0, flexShrink: 0 }}
+      >
+        🗑
+      </button>
     </li>
   );
 }
@@ -78,9 +89,14 @@ export function Widget({ store, hotkeyLabel, notice, onOpenQuick, onOpenDashboar
         </div>
       )}
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-        <strong style={{ fontSize: 15 }}>
-          {now.getMonth() + 1}월 {now.getDate()}일 ({WEEKDAYS[now.getDay()]})
+      <div
+        data-tauri-drag-region
+        data-testid="drag-handle"
+        onClick={stop}
+        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, cursor: 'move' }}
+      >
+        <strong style={{ fontSize: 15, flex: 1, pointerEvents: 'none' }} title="끌어서 위치 옮기기">
+          ⠿ {now.getMonth() + 1}월 {now.getDate()}일 ({WEEKDAYS[now.getDay()]})
         </strong>
         <button
           onClick={(e) => {

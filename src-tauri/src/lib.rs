@@ -14,6 +14,7 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent}
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, State, WindowEvent};
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+use tauri_plugin_window_state::{AppHandleExt, StateFlags};
 
 /// 앱 전체가 공유하는 상태.
 pub struct AppState {
@@ -133,6 +134,10 @@ fn open_quick(app: &AppHandle) {
 fn try_register_hotkey(app: &AppHandle, hotkey: &str) -> Result<(), String> {
     let gs = app.global_shortcut();
     let _ = gs.unregister_all();
+    // 이미 이 앱이 같은 키를 등록해 둔 상태라면 그대로 쓴다(중복 등록 오류로 잘못 알리지 않는다).
+    if gs.is_registered(hotkey) {
+        return Ok(());
+    }
     gs.on_shortcut(hotkey, |app, _shortcut, event| {
         if event.state() == ShortcutState::Pressed {
             open_quick(app);
@@ -299,6 +304,10 @@ pub fn run() {
         })
         // 대시보드를 닫아도 앱은 계속 실행한다. 숨기기만 한다.
         .on_window_event(|window, event| {
+            // 위젯을 끌어 옮기거나 크기를 바꾸면 바로 저장해 두어, 껐다 켜도 같은 자리에 뜬다.
+            if window.label() == "widget" && matches!(event, WindowEvent::Moved(_) | WindowEvent::Resized(_)) {
+                let _ = window.app_handle().save_window_state(StateFlags::all());
+            }
             if let WindowEvent::CloseRequested { api, .. } = event {
                 if window.label() == "dashboard" {
                     api.prevent_close();
