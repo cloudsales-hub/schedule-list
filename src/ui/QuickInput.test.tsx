@@ -16,6 +16,12 @@ function setup() {
 }
 
 describe('QuickInput', () => {
+  test('창이 잘 보이게 밝은 회색 2px 테두리와 둥근 모서리를 가진다', () => {
+    setup();
+    const root = screen.getByTestId('quick-root');
+    expect(root).toHaveStyle({ border: '2px solid #d0d0d0', borderRadius: '14px' });
+  });
+
   test('열리면 입력칸에 포커스가 있다', () => {
     const { input } = setup();
     expect(input).toHaveFocus();

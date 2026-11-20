@@ -183,14 +183,12 @@ describe('Widget', () => {
     expect(within(row('오늘마감')).getByText('11/20')).toHaveAttribute('data-overdue', 'true');
   });
 
-  test('항목이 아주 많거나 길어도 스크롤과 말줄임으로 처리한다', () => {
+  test('항목이 아주 많거나 길어도 목록 전체가 스크롤되고 긴 글은 말줄임으로 처리한다', () => {
     const many = Array.from({ length: 200 }, (_, i) =>
       item({ text: i === 0 ? 'ㄱ'.repeat(120) : `일${i}`, due: '2026-11-25T00:00' }),
     );
     setup(many);
-    const list = screen.getByTestId('urgent-list');
-    expect(list).toHaveStyle({ overflowY: 'auto' });
-    expect(list.style.maxHeight).not.toBe('');
+    expect(screen.getByTestId('scroll-area')).toHaveStyle({ overflowY: 'auto' });
     const long = screen.getByText('ㄱ'.repeat(120));
     expect(long).toHaveStyle({ whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' });
   });
@@ -210,17 +208,17 @@ describe('Widget', () => {
     expect(screen.getByRole('status')).toHaveTextContent('이미 사용 중인 키입니다');
   });
 
-  test('목록은 스크롤바와 삭제 버튼이 겹치지 않게 오른쪽 여백을 둔다', () => {
+  test('스크롤 칸은 스크롤바와 삭제 버튼이 겹치지 않게 오른쪽 여백을 둔다', () => {
     setup([item({ text: '가', due: '2026-11-25T00:00' }), item({ text: '나' })]);
-    expect(screen.getByTestId('urgent-list').style.paddingRight).toBe('10px');
-    expect(screen.getByTestId('todo-list').style.paddingRight).toBe('10px');
+    expect(screen.getByTestId('scroll-area').style.paddingRight).toBe('10px');
   });
 
-  test('항목이 없어도 높이를 억지로 채우지 않는다(내용만큼만 차지한다)', () => {
+  test('창 높이를 가득 채우고, 위·아래 줄은 고정한 채 가운데 목록만 줄어든다', () => {
     setup([]);
-    const root = screen.getByTestId('widget-root');
-    expect(root.style.height).toBe('');
-    expect(root.style.minHeight).toBe('');
+    expect(screen.getByTestId('widget-root')).toHaveStyle({ height: '100vh', display: 'flex', flexDirection: 'column' });
+    expect(['0', '0px']).toContain(screen.getByTestId('scroll-area').style.minHeight);
+    expect(screen.getByTestId('widget-top')).toHaveStyle({ flexShrink: '0' });
+    expect(screen.getByRole('button', { name: /대시보드 열기/ })).toHaveStyle({ flexShrink: '0' });
   });
 
   test('오늘 완료한 항목은 사라지지 않고 완료 표시와 함께 남는다', () => {

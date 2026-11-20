@@ -24,11 +24,8 @@ const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 const stop = (e: MouseEvent) => e.stopPropagation();
 
 const listStyle: CSSProperties = {
-  overflowY: 'auto',
-  maxHeight: 260,
   margin: 0,
   padding: 0,
-  paddingRight: 10, // 스크롤바와 삭제 버튼이 겹치지 않게
   listStyle: 'none',
 };
 
@@ -140,6 +137,9 @@ export function Widget({ store, hotkeyLabel, notice, onRaise, onOpenQuick, onOpe
       onMouseDown={() => onRaise?.()}
       style={{
         boxSizing: 'border-box',
+        height: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
         padding: 14,
         background: color.bg,
         color: color.text,
@@ -148,7 +148,7 @@ export function Widget({ store, hotkeyLabel, notice, onRaise, onOpenQuick, onOpe
         overflow: 'hidden',
       }}
     >
-      <div>
+      <div data-testid="widget-top" style={{ flexShrink: 0 }}>
       {notice && (
         <div role="status" style={{ marginBottom: 8, fontSize: 12, color: color.red }}>
           {notice}
@@ -191,11 +191,18 @@ export function Widget({ store, hotkeyLabel, notice, onRaise, onOpenQuick, onOpe
       <div style={{ marginBottom: 12 }}>
         <MemoInput store={store} now={() => new Date()} />
       </div>
+      </div>
 
+      {/* 창이 내용보다 낮으면 이 칸만 스크롤된다(목록 전체를 마우스 휠이나 스크롤바로 본다). */}
+      <div
+        data-testid="scroll-area"
+        style={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto', paddingRight: 10 /* 스크롤바와 삭제 버튼이 겹치지 않게 */ }}
+      >
+      <div data-testid="widget-content">
       {eventsShown.length > 0 && (
         <>
           <h3 style={{ fontSize: 12, color: color.sub, margin: '8px 0 4px' }}>🗓 일정</h3>
-          <ul data-testid="event-list" style={{ ...listStyle, maxHeight: 130 }}>
+          <ul data-testid="event-list" style={listStyle}>
             {eventsShown.map((it) => (
               <Row key={it.id} item={it} store={store} now={now} />
             ))}
@@ -211,16 +218,18 @@ export function Widget({ store, hotkeyLabel, notice, onRaise, onOpenQuick, onOpe
       </ul>
 
       <h3 style={{ fontSize: 12, color: color.sub, margin: '12px 0 4px' }}>📝 할일 ({todos.length})</h3>
-      <ul data-testid="todo-list" style={{ ...listStyle, maxHeight: 220 }}>
+      <ul data-testid="todo-list" style={listStyle}>
         {todosShown.map((it) => (
           <Row key={it.id} item={it} store={store} now={now} />
         ))}
       </ul>
       </div>
+      </div>
 
       <button
         onClick={onOpenDashboard}
         style={{
+          flexShrink: 0,
           marginTop: 10,
           width: '100%',
           background: 'transparent',

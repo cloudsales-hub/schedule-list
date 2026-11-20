@@ -12,6 +12,7 @@ interface Props {
 export function QuickInput({ store, now, onClose }: Props) {
   return (
     <div
+      data-testid="quick-root"
       style={{
         boxSizing: 'border-box',
         height: '100vh',
@@ -19,8 +20,8 @@ export function QuickInput({ store, now, onClose }: Props) {
         background: color.card,
         color: color.text,
         fontFamily: font,
-        border: `1px solid ${color.line}`,
-        borderRadius: 12,
+        border: '2px solid #d0d0d0', // 어떤 배경 위에서도 창이 보이도록 밝은 회색 테두리
+        borderRadius: 14,
       }}
     >
       <div style={{ fontSize: 12, color: color.sub, marginBottom: 8 }}>빠른 메모 · Enter 저장 · Esc 취소</div>
