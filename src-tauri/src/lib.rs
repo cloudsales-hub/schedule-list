@@ -174,29 +174,76 @@ fn show_window(app: AppHandle, label: String) -> Result<(), String> {
     win.set_focus().map_err(|e| e.to_string())
 }
 
-/// 위젯을 5초간 맨 앞으로 올렸다가 다시 바탕화면 위치(맨 아래)로 내린다.
+/// 위젯을 10초간 맨 앞으로 올렸다가 다시 바탕화면 위치(맨 아래)로 내린다.
+/// 숨겨져 있거나 화면 밖에 있어도 보이는 자리로 가져온다.
 fn peek_widget(app: &AppHandle) {
     let Some(win) = app.get_webview_window("widget") else { return };
+    ensure_widget_on_screen(app);
     let _ = win.show();
+    let _ = win.unminimize();
     let _ = win.set_always_on_bottom(false);
     let _ = win.set_always_on_top(true);
+    let _ = win.set_focus();
     std::thread::spawn(move || {
-        std::thread::sleep(Duration::from_secs(5));
+        std::thread::sleep(Duration::from_secs(10));
         let _ = win.set_always_on_top(false);
         let _ = win.set_always_on_bottom(true);
     });
 }
 
+/// 위젯을 화면 오른쪽 위로 옮긴다.
+fn move_widget_to_top_right(app: &AppHandle) {
+    let Some(win) = app.get_webview_window("widget") else { return };
+    let Ok(Some(monitor)) = win.primary_monitor() else { return };
+    let Ok(size) = win.outer_size() else { return };
+    let margin = (24.0 * monitor.scale_factor()) as i32;
+    let x = monitor.position().x + monitor.size().width as i32 - size.width as i32 - margin;
+    let y = monitor.position().y + margin;
+    let _ = win.set_position(PhysicalPosition::new(x, y));
+}
+
+/// 위젯이 어느 모니터 안에도 없으면(모니터를 뺐거나 해상도가 바뀐 경우) 오른쪽 위로 옮긴다.
+fn ensure_widget_on_screen(app: &AppHandle) {
+    let Some(win) = app.get_webview_window("widget") else { return };
+    let Ok(pos) = win.outer_position() else { return };
+    let Ok(size) = win.outer_size() else { return };
+    let (cx, cy) = (pos.x + size.width as i32 / 2, pos.y + 40);
+    let visible = win.available_monitors().map(|ms| {
+        ms.iter().any(|m| {
+            let (mx, my) = (m.position().x, m.position().y);
+            cx >= mx && cx < mx + m.size().width as i32 && cy >= my && cy < my + m.size().height as i32
+        })
+    });
+    if !matches!(visible, Ok(true)) {
+        move_widget_to_top_right(app);
+    }
+}
+
 fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
+    let show = MenuItem::with_id(app, "show", "위젯 보이기", true, None::<&str>)?;
+    let reset = MenuItem::with_id(app, "reset", "위젯 위치 초기화", true, None::<&str>)?;
+    let dash = MenuItem::with_id(app, "dashboard", "대시보드 열기", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "종료", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&quit])?;
+    let menu = Menu::with_items(app, &[&show, &reset, &dash, &quit])?;
     let mut builder = TrayIconBuilder::new()
         .menu(&menu)
         .show_menu_on_left_click(false)
         .tooltip("일정·할일 위젯")
         .on_menu_event(|app, event| {
-            if event.id.as_ref() == "quit" {
-                app.exit(0);
+            match event.id.as_ref() {
+                "quit" => app.exit(0),
+                "show" => peek_widget(app),
+                "reset" => {
+                    move_widget_to_top_right(app);
+                    peek_widget(app);
+                }
+                "dashboard" => {
+                    if let Some(w) = app.get_webview_window("dashboard") {
+                        let _ = w.show();
+                        let _ = w.set_focus();
+                    }
+                }
+                _ => {}
             }
         })
         .on_tray_icon_event(|tray, event| {
@@ -216,19 +263,14 @@ fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
-/// 저장된 위치가 없는 첫 실행이면 위젯을 화면 오른쪽 위에 놓는다.
+/// 저장된 위치가 없는 첫 실행이면 위젯을 화면 오른쪽 위에 놓고, 저장된 위치가 화면 밖이면 바로잡는다.
 fn place_widget_first_time(app: &AppHandle) {
     let state_file = app.path().app_config_dir().map(|d| d.join(".window-state.json"));
     if matches!(&state_file, Ok(f) if f.exists()) {
-        return;
+        ensure_widget_on_screen(app);
+    } else {
+        move_widget_to_top_right(app);
     }
-    let Some(win) = app.get_webview_window("widget") else { return };
-    let Ok(Some(monitor)) = win.primary_monitor() else { return };
-    let Ok(size) = win.outer_size() else { return };
-    let margin = (24.0 * monitor.scale_factor()) as i32;
-    let x = monitor.position().x + monitor.size().width as i32 - size.width as i32 - margin;
-    let y = monitor.position().y + margin;
-    let _ = win.set_position(PhysicalPosition::new(x, y));
 }
 
 /// 현재 데이터 폴더를 감시한다. 폴더가 바뀌면 다시 호출해서 감시 대상을 바꾼다.
