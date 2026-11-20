@@ -65,8 +65,9 @@ export function Widget({ store, hotkeyLabel, notice, onOpenQuick, onOpenDashboar
 
   return (
     <div
-      onClick={onOpenDashboard}
       style={{
+        display: 'flex',
+        flexDirection: 'column',
         boxSizing: 'border-box',
         height: '100vh',
         padding: 14,
@@ -75,9 +76,9 @@ export function Widget({ store, hotkeyLabel, notice, onOpenQuick, onOpenDashboar
         fontFamily: font,
         borderRadius: 12,
         overflow: 'hidden',
-        cursor: 'pointer',
       }}
     >
+      <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
       {notice && (
         <div role="status" style={{ marginBottom: 8, fontSize: 12, color: color.red }}>
           {notice}
@@ -117,7 +118,7 @@ export function Widget({ store, hotkeyLabel, notice, onOpenQuick, onOpenDashboar
         </button>
       </div>
 
-      <div onClick={stop} style={{ marginBottom: 12, cursor: 'auto' }}>
+      <div style={{ marginBottom: 12 }}>
         <MemoInput store={store} now={() => new Date()} />
       </div>
 
@@ -134,6 +135,24 @@ export function Widget({ store, hotkeyLabel, notice, onOpenQuick, onOpenDashboar
           <Row key={it.id} item={it} store={store} now={now} />
         ))}
       </ul>
+      </div>
+
+      <button
+        onClick={onOpenDashboard}
+        style={{
+          marginTop: 10,
+          width: '100%',
+          background: 'transparent',
+          color: '#9cc0ff',
+          border: `1px solid ${color.blue}`,
+          borderRadius: 8,
+          padding: '8px 0',
+          fontSize: 13,
+          cursor: 'pointer',
+        }}
+      >
+        ▦ 대시보드 열기
+      </button>
     </div>
   );
 }

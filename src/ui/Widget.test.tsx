@@ -106,9 +106,16 @@ describe('Widget', () => {
     expect(onOpenDashboard).not.toHaveBeenCalled();
   });
 
-  test('항목 영역을 누르면 대시보드를 연다', () => {
+  test('항목이나 빈 곳을 눌러도 대시보드는 열리지 않는다', () => {
     const { onOpenDashboard } = setup([item({ text: '견적서', due: '2026-11-20T17:00', hasTime: true })]);
     fireEvent.click(screen.getByText('견적서'));
+    fireEvent.click(screen.getByTestId('urgent-list'));
+    expect(onOpenDashboard).not.toHaveBeenCalled();
+  });
+
+  test('대시보드 열기 버튼만 대시보드를 연다', () => {
+    const { onOpenDashboard } = setup([]);
+    fireEvent.click(screen.getByRole('button', { name: /대시보드 열기/ }));
     expect(onOpenDashboard).toHaveBeenCalledTimes(1);
   });
 
