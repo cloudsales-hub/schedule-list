@@ -1,6 +1,6 @@
 import { useState, type CSSProperties, type MouseEvent } from 'react';
 import type { Item } from '../core/model';
-import { doneToday, plainTodos, urgentTasks } from '../core/selectors';
+import { doneToday, plainTodos, upcomingEvents, urgentTasks } from '../core/selectors';
 import type { ItemsStore } from '../core/store';
 import { DoneBadge, DoneToggle } from './DoneToggle';
 import { dueLabel } from './dueLabel';
@@ -127,6 +127,10 @@ export function Widget({ store, hotkeyLabel, notice, onRaise, onOpenQuick, onOpe
   const todos = plainTodos(store.items);
   // 오늘 완료한 항목은 각 목록 맨 아래에 남긴다(자정이 지나면 사라진다).
   const doneTasks = doneToday(store.items, now).filter((i) => i.kind === 'task');
+  const eventsShown = [
+    ...upcomingEvents(store.items, now).filter((i) => !i.done),
+    ...doneToday(store.items, now).filter((i) => i.kind === 'event'),
+  ];
   const urgentShown = [...urgent, ...doneTasks.filter((i) => i.due !== null)];
   const todosShown = [...todos, ...doneTasks.filter((i) => i.due === null)];
 
@@ -187,6 +191,17 @@ export function Widget({ store, hotkeyLabel, notice, onRaise, onOpenQuick, onOpe
       <div style={{ marginBottom: 12 }}>
         <MemoInput store={store} now={() => new Date()} />
       </div>
+
+      {eventsShown.length > 0 && (
+        <>
+          <h3 style={{ fontSize: 12, color: color.sub, margin: '8px 0 4px' }}>🗓 일정</h3>
+          <ul data-testid="event-list" style={{ ...listStyle, maxHeight: 130 }}>
+            {eventsShown.map((it) => (
+              <Row key={it.id} item={it} store={store} now={now} />
+            ))}
+          </ul>
+        </>
+      )}
 
       <h3 style={{ fontSize: 12, color: color.sub, margin: '8px 0 4px' }}>🔥 급한 것</h3>
       <ul data-testid="urgent-list" style={listStyle}>

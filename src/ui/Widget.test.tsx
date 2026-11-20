@@ -53,7 +53,7 @@ afterEach(() => {
 });
 
 describe('Widget', () => {
-  test('급한 것, 할일만 보이고 일정은 보이지 않는다', () => {
+  test('급한 것, 할일, 일정이 보인다', () => {
     setup([
       item({ text: '견적서', due: '2026-11-20T17:00', hasTime: true }),
       item({ text: '보고서', due: '2026-11-27T00:00' }),
@@ -67,7 +67,24 @@ describe('Widget', () => {
     expect(screen.getByText('견적서')).toBeInTheDocument();
     expect(screen.getByText('보고서')).toBeInTheDocument();
     expect(screen.getByText('책 반납')).toBeInTheDocument();
-    expect(screen.queryByText('팀 회의')).toBeNull();
+    expect(screen.getByText(/🗓 일정/)).toBeInTheDocument();
+    expect(within(screen.getByTestId('event-list')).getByText('팀 회의')).toBeInTheDocument();
+    expect(screen.getByText(/할일 \(3\)/)).toBeInTheDocument(); // 일정은 할일 개수에 들어가지 않는다
+  });
+
+  test('일정이 없으면 일정 칸 자체를 없앤다', () => {
+    setup([item({ text: '메일 회신' })]);
+    expect(screen.queryByText(/🗓 일정/)).toBeNull();
+    expect(screen.queryByTestId('event-list')).toBeNull();
+  });
+
+  test('지난 일정은 보이지 않고, 오늘 완료한 일정은 완료 표시로 남는다', () => {
+    setup([
+      item({ text: '어제 미팅', kind: 'event', due: '2026-11-19T10:00', hasTime: true }),
+      item({ text: '2시 미팅', kind: 'event', due: '2026-11-20T14:00', hasTime: true, done: true, updatedAt: NOW.getTime() }),
+    ]);
+    expect(screen.queryByText('어제 미팅')).toBeNull();
+    expect(within(screen.getByTestId('event-list')).getByText('2시 미팅')).toBeInTheDocument();
   });
 
   test('마감 라벨을 보여 준다', () => {
