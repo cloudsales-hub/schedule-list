@@ -20,7 +20,14 @@ interface Props {
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 const stop = (e: MouseEvent) => e.stopPropagation();
 
-const listStyle: CSSProperties = { overflowY: 'auto', maxHeight: 220, margin: 0, padding: 0, listStyle: 'none' };
+const listStyle: CSSProperties = {
+  overflowY: 'auto',
+  maxHeight: 260,
+  margin: 0,
+  padding: 0,
+  paddingRight: 10, // 스크롤바와 삭제 버튼이 겹치지 않게
+  listStyle: 'none',
+};
 
 function Row({ item, store, now }: { item: Item; store: ItemsStore; now: Date }) {
   const label = dueLabel(item, now);
@@ -65,11 +72,9 @@ export function Widget({ store, hotkeyLabel, notice, onOpenQuick, onOpenDashboar
 
   return (
     <div
+      data-testid="widget-root"
       style={{
-        display: 'flex',
-        flexDirection: 'column',
         boxSizing: 'border-box',
-        height: '100vh',
         padding: 14,
         background: color.bg,
         color: color.text,
@@ -78,7 +83,7 @@ export function Widget({ store, hotkeyLabel, notice, onOpenQuick, onOpenDashboar
         overflow: 'hidden',
       }}
     >
-      <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+      <div>
       {notice && (
         <div role="status" style={{ marginBottom: 8, fontSize: 12, color: color.red }}>
           {notice}
@@ -130,7 +135,7 @@ export function Widget({ store, hotkeyLabel, notice, onOpenQuick, onOpenDashboar
       </ul>
 
       <h3 style={{ fontSize: 12, color: color.sub, margin: '12px 0 4px' }}>📝 할일 ({todos.length})</h3>
-      <ul data-testid="todo-list" style={{ ...listStyle, maxHeight: 180 }}>
+      <ul data-testid="todo-list" style={{ ...listStyle, maxHeight: 220 }}>
         {todos.map((it) => (
           <Row key={it.id} item={it} store={store} now={now} />
         ))}

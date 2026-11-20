@@ -193,6 +193,19 @@ describe('Widget', () => {
     expect(screen.getByRole('status')).toHaveTextContent('이미 사용 중인 키입니다');
   });
 
+  test('목록은 스크롤바와 삭제 버튼이 겹치지 않게 오른쪽 여백을 둔다', () => {
+    setup([item({ text: '가', due: '2026-11-25T00:00' }), item({ text: '나' })]);
+    expect(screen.getByTestId('urgent-list').style.paddingRight).toBe('10px');
+    expect(screen.getByTestId('todo-list').style.paddingRight).toBe('10px');
+  });
+
+  test('항목이 없어도 높이를 억지로 채우지 않는다(내용만큼만 차지한다)', () => {
+    setup([]);
+    const root = screen.getByTestId('widget-root');
+    expect(root.style.height).toBe('');
+    expect(root.style.minHeight).toBe('');
+  });
+
   test('저장소 오류 문구를 위쪽에 보여 준다', () => {
     setup([], { status: 'error', error: '데이터 파일을 저장하지 못했습니다: disk full' });
     expect(screen.getByRole('alert')).toHaveTextContent('데이터 파일을 저장하지 못했습니다: disk full');
