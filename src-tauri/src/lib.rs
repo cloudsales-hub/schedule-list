@@ -16,6 +16,8 @@ use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 use tauri_plugin_window_state::{AppHandleExt, StateFlags};
 
+mod updater;
+
 /// 앱 전체가 공유하는 상태.
 pub struct AppState {
     settings: Mutex<Settings>,
@@ -364,6 +366,7 @@ pub fn run() {
                 .with_denylist(&["quick", "dashboard"])
                 .build(),
         )
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
         .plugin(tauri_plugin_dialog::init())
@@ -391,6 +394,7 @@ pub fn run() {
             apply_autostart(app.handle(), autostart);
             setup_tray(app.handle())?;
             place_widget_first_time(app.handle());
+            updater::check_in_background(app.handle().clone());
             Ok(())
         })
         // 대시보드를 닫아도 앱은 계속 실행한다. 숨기기만 한다.

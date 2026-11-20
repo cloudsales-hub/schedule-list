@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "ScheduleWidget",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "identifier": "com.personal.schedulewidget",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -74,6 +74,18 @@
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/icon.ico"
-    ]
+    ],
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDgzMkYzRTU5NjI5MTg5RjUKUldUMWlaRmlXVDR2ZzA4bHkwSjQyYjZDblRLN0dLSUpaQ0lGdW81UC9RN292Uk5aVzJDd0w0YXoK",
+      "endpoints": [
+        "https://github.com/cloudsales-hub/schedule-list/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }
