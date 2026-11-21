@@ -37,7 +37,7 @@ function App() {
       notice={notice}
       onRaise={raiseWidget}
       onOpenQuick={() => void showWindow('quick')}
-      onOpenDashboard={() => void showWindow('dashboard')}
+      onOpenSettings={() => void showWindow('settings')}
     />
   );
 }

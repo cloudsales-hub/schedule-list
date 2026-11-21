@@ -8,25 +8,21 @@ const base: Settings = {
   hotkey: 'Alt+Backquote',
   dataDir: 'C:\\Users\\me\\OneDrive\\일정위젯',
   autostart: true,
-  bannerPath: null,
-  bannerHeight: 320,
 };
 
-function setup(over: Partial<Settings> = {}, props: { hotkeyError?: string | null; folder?: string | null; image?: string | null } = {}) {
+function setup(over: Partial<Settings> = {}, props: { hotkeyError?: string | null; folder?: string | null} = {}) {
   const onSave = vi.fn().mockResolvedValue(undefined);
   const onPickFolder = vi.fn().mockResolvedValue(props.folder ?? null);
-  const onPickImage = vi.fn().mockResolvedValue(props.image ?? null);
   const settings = { ...base, ...over };
   render(
     <SettingsPanel
       settings={settings}
       onSave={onSave}
       onPickFolder={onPickFolder}
-      onPickImage={onPickImage}
       hotkeyError={props.hotkeyError ?? null}
     />,
   );
-  return { onSave, onPickFolder, onPickImage, settings };
+  return { onSave, onPickFolder, settings };
 }
 
 describe('formatHotkey', () => {
@@ -85,38 +81,18 @@ describe('SettingsPanel', () => {
     expect(screen.getByText(/이미 사용 중인 키입니다/)).toBeInTheDocument();
   });
 
-  test('배너 크기를 고른다', async () => {
-    const { onSave, settings } = setup();
-    await userEvent.setup().click(screen.getByRole('radio', { name: /보통/ }));
-    expect(onSave).toHaveBeenCalledWith({ ...settings, bannerHeight: 240 });
-  });
-
-  test('배너 이미지를 고르고 기본 그림으로 되돌린다', async () => {
-    const picked = setup({}, { image: 'C:\\pics\\room.png' });
-    const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: '배너 이미지 선택' }));
-    await waitFor(() => expect(picked.onSave).toHaveBeenCalledWith({ ...picked.settings, bannerPath: 'C:\\pics\\room.png' }));
-  });
-
-  test('이미지 선택을 취소하면 바뀌지 않는다', async () => {
-    const { onSave, onPickImage } = setup({}, { image: null });
-    await userEvent.setup().click(screen.getByRole('button', { name: '배너 이미지 선택' }));
-    await waitFor(() => expect(onPickImage).toHaveBeenCalled());
-    expect(onSave).not.toHaveBeenCalled();
-  });
-
-  test('기본 그림으로 버튼은 bannerPath를 비운다', async () => {
-    const { onSave, settings } = setup({ bannerPath: 'C:\\pics\\room.png' });
-    await userEvent.setup().click(screen.getByRole('button', { name: '기본 그림으로' }));
-    expect(onSave).toHaveBeenCalledWith({ ...settings, bannerPath: null });
-  });
-
   test('데이터 폴더를 고른다', async () => {
     const { onSave, settings } = setup({}, { folder: 'D:\\Sync\\일정' });
     expect(screen.getByText(base.dataDir!)).toBeInTheDocument();
     expect(screen.getByText(/OneDrive/, { selector: 'p' })).toBeInTheDocument();
     await userEvent.setup().click(screen.getByRole('button', { name: '폴더 선택' }));
     await waitFor(() => expect(onSave).toHaveBeenCalledWith({ ...settings, dataDir: 'D:\\Sync\\일정' }));
+  });
+
+  test('대시보드와 함께 없어진 배너 설정은 보이지 않는다', () => {
+    setup();
+    expect(screen.queryByText('배너')).toBeNull();
+    expect(screen.queryByRole('button', { name: /배너/ })).toBeNull();
   });
 
   test('자동 실행을 끈다', async () => {

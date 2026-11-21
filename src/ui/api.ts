@@ -9,9 +9,6 @@ export interface Settings {
   hotkey: string;
   dataDir: string | null;
   autostart: boolean;
-  /** null이면 기본 그림 */
-  bannerPath: string | null;
-  bannerHeight: 160 | 240 | 320;
 }
 
 export function tauriBackend(): Backend {
@@ -49,7 +46,7 @@ export async function saveSettings(settings: Settings): Promise<void> {
 }
 
 /** 이미 만들어진 창을 앞으로 가져온다. 아직 없는 창이면 조용히 넘어간다. */
-export async function showWindow(label: 'widget' | 'quick' | 'dashboard'): Promise<void> {
+export async function showWindow(label: 'widget' | 'quick' | 'settings'): Promise<void> {
   try {
     await invoke('show_window', { label });
   } catch {
@@ -84,15 +81,6 @@ export function suggestedDataDir(): Promise<string | null> {
 /** 폴더 선택 창. 취소하면 null. */
 export async function pickFolder(): Promise<string | null> {
   const r = await open({ directory: true, multiple: false });
-  return typeof r === 'string' ? r : null;
-}
-
-/** 배너로 쓸 이미지 파일 선택 창. 취소하면 null. */
-export async function pickImage(): Promise<string | null> {
-  const r = await open({
-    multiple: false,
-    filters: [{ name: '이미지', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif'] }],
-  });
   return typeof r === 'string' ? r : null;
 }
 

@@ -42,9 +42,9 @@ function setup(items: Item[], extra = {}, onRaise: () => void = () => {}) {
   vi.setSystemTime(NOW);
   const store = fakeStore(items, extra);
   const onOpenQuick = vi.fn();
-  const onOpenDashboard = vi.fn();
-  render(<Widget store={store} hotkeyLabel="Alt+~" onRaise={onRaise} onOpenQuick={onOpenQuick} onOpenDashboard={onOpenDashboard} />);
-  return { store, onOpenQuick, onOpenDashboard };
+  const onOpenSettings = vi.fn();
+  render(<Widget store={store} hotkeyLabel="Alt+~" onRaise={onRaise} onOpenQuick={onOpenQuick} onOpenSettings={onOpenSettings} />);
+  return { store, onOpenQuick, onOpenSettings };
 }
 
 afterEach(() => {
@@ -99,57 +99,57 @@ describe('Widget', () => {
   });
 
   test('＋ 메모 버튼에 단축키가 보이고 누르면 빠른 입력을 연다', async () => {
-    const { onOpenQuick, onOpenDashboard } = setup([]);
+    const { onOpenQuick, onOpenSettings } = setup([]);
     const btn = screen.getByRole('button', { name: /메모/ });
     expect(btn).toHaveTextContent('Alt+~');
     fireEvent.click(btn);
     expect(onOpenQuick).toHaveBeenCalledTimes(1);
-    expect(onOpenDashboard).not.toHaveBeenCalled();
+    expect(onOpenSettings).not.toHaveBeenCalled();
   });
 
-  test('체크 칸은 완료 처리만 하고 대시보드를 열지 않는다', () => {
+  test('체크 칸은 완료 처리만 하고 설정 창을 열지 않는다', () => {
     const it = item({ text: '견적서', due: '2026-11-20T17:00', hasTime: true });
-    const { store, onOpenDashboard } = setup([it]);
+    const { store, onOpenSettings } = setup([it]);
     fireEvent.click(screen.getByRole('checkbox'));
     expect(store.update).toHaveBeenCalledWith(it.id, { done: true });
-    expect(onOpenDashboard).not.toHaveBeenCalled();
+    expect(onOpenSettings).not.toHaveBeenCalled();
   });
 
-  test('삭제 버튼은 항목을 지우고 대시보드를 열지 않는다', () => {
+  test('삭제 버튼은 항목을 지우고 설정 창을 열지 않는다', () => {
     const it = item({ text: '잘못 적은 메모' });
-    const { store, onOpenDashboard } = setup([it]);
+    const { store, onOpenSettings } = setup([it]);
     fireEvent.click(screen.getByRole('button', { name: '삭제' }));
     expect((store as unknown as { remove: ReturnType<typeof vi.fn> }).remove).toHaveBeenCalledWith(it.id);
-    expect(onOpenDashboard).not.toHaveBeenCalled();
+    expect(onOpenSettings).not.toHaveBeenCalled();
   });
 
-  test('항목이나 빈 곳을 눌러도 대시보드는 열리지 않는다', () => {
-    const { onOpenDashboard } = setup([item({ text: '견적서', due: '2026-11-20T17:00', hasTime: true })]);
+  test('항목이나 빈 곳을 눌러도 설정 창은 열리지 않는다', () => {
+    const { onOpenSettings } = setup([item({ text: '견적서', due: '2026-11-20T17:00', hasTime: true })]);
     fireEvent.click(screen.getByText('견적서'));
     fireEvent.click(screen.getByTestId('urgent-list'));
-    expect(onOpenDashboard).not.toHaveBeenCalled();
+    expect(onOpenSettings).not.toHaveBeenCalled();
   });
 
-  test('대시보드 열기 버튼만 대시보드를 연다', () => {
-    const { onOpenDashboard } = setup([]);
-    fireEvent.click(screen.getByRole('button', { name: /대시보드 열기/ }));
-    expect(onOpenDashboard).toHaveBeenCalledTimes(1);
+  test('설정 버튼만 설정 창을 연다', () => {
+    const { onOpenSettings } = setup([]);
+    fireEvent.click(screen.getByRole('button', { name: '설정' }));
+    expect(onOpenSettings).toHaveBeenCalledTimes(1);
   });
 
-  test('윗줄(날짜)은 끌어서 옮기는 자리이고 눌러도 대시보드가 열리지 않는다', () => {
-    const { onOpenDashboard } = setup([]);
+  test('윗줄(날짜)은 끌어서 옮기는 자리이고 눌러도 설정 창이 열리지 않는다', () => {
+    const { onOpenSettings } = setup([]);
     const handle = screen.getByTestId('drag-handle');
     expect(handle).toHaveAttribute('data-tauri-drag-region');
     fireEvent.click(handle);
-    expect(onOpenDashboard).not.toHaveBeenCalled();
+    expect(onOpenSettings).not.toHaveBeenCalled();
   });
 
-  test('위젯 입력칸에 쓰면 저장하고 대시보드는 열지 않는다', async () => {
+  test('위젯 입력칸에 쓰면 저장하고 설정 창은 열지 않는다', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(NOW);
     const store = fakeStore([]);
-    const onOpenDashboard = vi.fn();
-    render(<Widget store={store} hotkeyLabel="Alt+~" onOpenQuick={() => {}} onOpenDashboard={onOpenDashboard} />);
+    const onOpenSettings = vi.fn();
+    render(<Widget store={store} hotkeyLabel="Alt+~" onOpenQuick={() => {}} onOpenSettings={onOpenSettings} />);
     const user = userEvent.setup();
     await user.type(screen.getByRole('textbox'), '내일 오전까지 견적서');
     await user.keyboard('{Enter}');
@@ -160,7 +160,7 @@ describe('Widget', () => {
       due: '2026-11-21T12:00',
       hasTime: true,
     });
-    expect(onOpenDashboard).not.toHaveBeenCalled();
+    expect(onOpenSettings).not.toHaveBeenCalled();
   });
 
   test('자정을 넘기면 라벨과 빨간색이 바뀐다', () => {
@@ -170,7 +170,7 @@ describe('Widget', () => {
       item({ text: '내일마감', due: '2026-11-21T00:00' }),
       item({ text: '오늘마감', due: '2026-11-20T00:00' }),
     ]);
-    render(<Widget store={store} hotkeyLabel="Alt+~" onOpenQuick={() => {}} onOpenDashboard={() => {}} />);
+    render(<Widget store={store} hotkeyLabel="Alt+~" onOpenQuick={() => {}} onOpenSettings={() => {}} />);
     const row = (t: string) => screen.getByText(t).closest('[data-testid="row"]') as HTMLElement;
     expect(within(row('내일마감')).getByText('내일')).toBeInTheDocument();
     expect(within(row('오늘마감')).getByText('오늘')).toHaveAttribute('data-overdue', 'false');
@@ -202,7 +202,7 @@ describe('Widget', () => {
         hotkeyLabel="Alt+~"
         notice="이미 사용 중인 키입니다. 설정에서 다른 키를 골라 주세요"
         onOpenQuick={() => {}}
-        onOpenDashboard={() => {}}
+        onOpenSettings={() => {}}
       />,
     );
     expect(screen.getByRole('status')).toHaveTextContent('이미 사용 중인 키입니다');
@@ -218,7 +218,7 @@ describe('Widget', () => {
     expect(screen.getByTestId('widget-root')).toHaveStyle({ height: '100vh', display: 'flex', flexDirection: 'column' });
     expect(['0', '0px']).toContain(screen.getByTestId('scroll-area').style.minHeight);
     expect(screen.getByTestId('widget-top')).toHaveStyle({ flexShrink: '0' });
-    expect(screen.getByRole('button', { name: /대시보드 열기/ })).toHaveStyle({ flexShrink: '0' });
+    expect(screen.queryByRole('button', { name: /대시보드/ })).toBeNull();
   });
 
   test('오늘 완료한 항목은 사라지지 않고 완료 표시와 함께 남는다', () => {
@@ -241,7 +241,7 @@ describe('Widget', () => {
 
   test('메모 글자를 누르면 그 자리에서 고치고 Enter로 저장한다', async () => {
     const it = item({ text: '견적서 보내기', due: '2026-11-25T00:00' });
-    const { store, onOpenDashboard } = setup([it]);
+    const { store, onOpenSettings } = setup([it]);
     const user = userEvent.setup();
     await user.click(screen.getByText('견적서 보내기'));
     const box = screen.getByRole('textbox', { name: '메모 고치기' });
@@ -249,7 +249,7 @@ describe('Widget', () => {
     await user.clear(box);
     await user.type(box, '견적서 수정해서 보내기{Enter}');
     expect(store.update).toHaveBeenCalledWith(it.id, { text: '견적서 수정해서 보내기' });
-    expect(onOpenDashboard).not.toHaveBeenCalled();
+    expect(onOpenSettings).not.toHaveBeenCalled();
     expect(screen.queryByRole('textbox', { name: '메모 고치기' })).toBeNull();
   });
 

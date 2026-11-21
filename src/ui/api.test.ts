@@ -69,8 +69,6 @@ describe('설정', () => {
     hotkey: 'Alt+Backquote',
     dataDir: null,
     autostart: true,
-    bannerPath: null,
-    bannerHeight: 320,
   };
 
   test('getSettings는 get_settings를 부른다', async () => {

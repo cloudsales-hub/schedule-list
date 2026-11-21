@@ -7,8 +7,6 @@ use std::path::{Path, PathBuf};
 const DEFAULT_HOTKEY: &str = "Alt+Backquote";
 /// 예전 버전의 기본 키. 윈도우가 먼저 가져가 동작하지 않아 새 기본 키로 바꾼다.
 const OLD_DEFAULT_HOTKEY: &str = "Super+J";
-const DEFAULT_BANNER_HEIGHT: u32 = 320;
-const ALLOWED_BANNER_HEIGHTS: [u32; 3] = [160, 240, 320];
 const DATA_FILE_NAME: &str = "schedule-data.json";
 const ONEDRIVE_SUBFOLDER: &str = "일정위젯";
 
@@ -19,10 +17,6 @@ pub struct Settings {
     pub hotkey: String,
     pub data_dir: Option<String>,
     pub autostart: bool,
-    /// 비우면 기본 그림을 쓴다
-    pub banner_path: Option<String>,
-    /// 160 | 240 | 320
-    pub banner_height: u32,
 }
 
 impl Default for Settings {
@@ -31,18 +25,13 @@ impl Default for Settings {
             hotkey: DEFAULT_HOTKEY.to_string(),
             data_dir: None,
             autostart: true,
-            banner_path: None,
-            banner_height: DEFAULT_BANNER_HEIGHT,
         }
     }
 }
 
 impl Settings {
-    /// 허용되지 않는 값을 기본값으로 바로잡는다.
+    /// 비어 있거나 옛 기본 키인 값을 바로잡는다.
     pub fn normalized(mut self) -> Settings {
-        if !ALLOWED_BANNER_HEIGHTS.contains(&self.banner_height) {
-            self.banner_height = DEFAULT_BANNER_HEIGHT;
-        }
         if self.hotkey.trim().is_empty() || self.hotkey == OLD_DEFAULT_HOTKEY {
             self.hotkey = DEFAULT_HOTKEY.to_string();
         }
@@ -97,34 +86,27 @@ mod tests {
         assert_eq!(s.hotkey, "Alt+Backquote");
         assert_eq!(s.data_dir, None);
         assert!(s.autostart);
-        assert_eq!(s.banner_path, None);
-        assert_eq!(s.banner_height, 320);
     }
 
     #[test]
     fn json_필드_이름은_camel_case() {
         let json = serde_json::to_string(&Settings::default()).unwrap();
         assert!(json.contains("\"dataDir\""), "{json}");
-        assert!(json.contains("\"bannerHeight\":320"), "{json}");
-        assert!(json.contains("\"bannerPath\""), "{json}");
+        assert!(json.contains("\"autostart\":true"), "{json}");
+        assert!(!json.contains("banner"), "{json}");
     }
 
     #[test]
     fn 일부만_있는_json은_나머지를_기본값으로_채운다() {
         let s: Settings = serde_json::from_str("{\"hotkey\":\"Alt+Z\"}").unwrap();
         assert_eq!(s.hotkey, "Alt+Z");
-        assert_eq!(s.banner_height, 320);
         assert!(s.autostart);
     }
 
     #[test]
-    fn 허용되지_않는_배너_높이는_320으로_바로잡는다() {
-        for ok in [160, 240, 320] {
-            let s = Settings { banner_height: ok, ..Settings::default() }.normalized();
-            assert_eq!(s.banner_height, ok);
-        }
-        let s = Settings { banner_height: 999, ..Settings::default() }.normalized();
-        assert_eq!(s.banner_height, 320);
+    fn 예전_설정_파일의_배너_항목은_무시하고_읽는다() {
+        let s: Settings = serde_json::from_str("{\"hotkey\":\"Alt+Z\",\"bannerHeight\":240,\"bannerPath\":\"x.png\"}").unwrap();
+        assert_eq!(s.hotkey, "Alt+Z");
     }
 
     #[test]
@@ -197,7 +179,7 @@ mod tests {
     fn 설정을_저장하고_다시_읽는다() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("settings.json");
-        let s = Settings { hotkey: "Alt+Z".into(), banner_height: 240, ..Settings::default() };
+        let s = Settings { hotkey: "Alt+Z".into(), autostart: false, ..Settings::default() };
         save_settings_file(&path, &s).unwrap();
         assert_eq!(load_settings_file(&path), s);
     }

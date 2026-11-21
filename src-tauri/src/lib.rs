@@ -269,10 +269,10 @@ fn ensure_widget_on_screen(app: &AppHandle) {
 fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
     let show = MenuItem::with_id(app, "show", "위젯 보이기", true, None::<&str>)?;
     let reset = MenuItem::with_id(app, "reset", "위젯 위치 초기화", true, None::<&str>)?;
-    let dash = MenuItem::with_id(app, "dashboard", "대시보드 열기", true, None::<&str>)?;
+    let settings = MenuItem::with_id(app, "settings", "설정", true, None::<&str>)?;
     let update = MenuItem::with_id(app, "update", format!("업데이트 확인 (v{})", env!("CARGO_PKG_VERSION")), true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "종료", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&show, &reset, &dash, &update, &quit])?;
+    let menu = Menu::with_items(app, &[&show, &reset, &settings, &update, &quit])?;
     let mut builder = TrayIconBuilder::new()
         .menu(&menu)
         .show_menu_on_left_click(false)
@@ -286,8 +286,8 @@ fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
                     move_widget_to_top_right(app);
                     peek_widget(app);
                 }
-                "dashboard" => {
-                    if let Some(w) = app.get_webview_window("dashboard") {
+                "settings" => {
+                    if let Some(w) = app.get_webview_window("settings") {
                         let _ = w.show();
                         let _ = w.set_focus();
                     }
@@ -364,8 +364,8 @@ pub fn run() {
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| peek_widget(app)))
         .plugin(
             tauri_plugin_window_state::Builder::default()
-                // 빠른 입력창과 대시보드는 항상 숨긴 채로 시작해야 하므로 위치·보임 상태를 기억하지 않는다.
-                .with_denylist(&["quick", "dashboard"])
+                // 빠른 입력창과 설정 창은 항상 숨긴 채로 시작해야 하므로 위치·보임 상태를 기억하지 않는다.
+                .with_denylist(&["quick", "settings"])
                 .build(),
         )
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -414,7 +414,7 @@ pub fn run() {
                 let _ = window.app_handle().save_window_state(StateFlags::all());
             }
             if let WindowEvent::CloseRequested { api, .. } = event {
-                if window.label() == "dashboard" {
+                if window.label() == "settings" {
                     api.prevent_close();
                     let _ = window.hide();
                 }

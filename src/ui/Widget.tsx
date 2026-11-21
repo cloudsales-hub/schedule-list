@@ -17,7 +17,7 @@ interface Props {
   /** 위젯을 눌렀을 때 다른 창 뒤에 가려져 있으면 맨 앞으로 올려 달라는 요청 */
   onRaise?(): void;
   onOpenQuick(): void;
-  onOpenDashboard(): void;
+  onOpenSettings(): void;
 }
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
@@ -117,7 +117,7 @@ function Row({ item, store, now }: { item: Item; store: ItemsStore; now: Date })
   );
 }
 
-export function Widget({ store, hotkeyLabel, notice, onRaise, onOpenQuick, onOpenDashboard }: Props) {
+export function Widget({ store, hotkeyLabel, notice, onRaise, onOpenQuick, onOpenSettings }: Props) {
   useStore(store);
   const now = useNow();
   const urgent = urgentTasks(store.items, now);
@@ -169,6 +169,17 @@ export function Widget({ store, hotkeyLabel, notice, onRaise, onOpenQuick, onOpe
         <strong style={{ fontSize: 15, flex: 1, pointerEvents: 'none' }} title="끌어서 위치 옮기기">
           ⠿ {now.getMonth() + 1}월 {now.getDate()}일 ({WEEKDAYS[now.getDay()]})
         </strong>
+        <button
+          aria-label="설정"
+          title="설정"
+          onClick={(e) => {
+            stop(e);
+            onOpenSettings();
+          }}
+          style={{ background: 'transparent', border: 'none', color: color.sub, cursor: 'pointer', fontSize: 15, padding: '0 8px' }}
+        >
+          ⚙
+        </button>
         <button
           onClick={(e) => {
             stop(e);
@@ -226,23 +237,6 @@ export function Widget({ store, hotkeyLabel, notice, onRaise, onOpenQuick, onOpe
       </div>
       </div>
 
-      <button
-        onClick={onOpenDashboard}
-        style={{
-          flexShrink: 0,
-          marginTop: 10,
-          width: '100%',
-          background: 'transparent',
-          color: '#9cc0ff',
-          border: `1px solid ${color.blue}`,
-          borderRadius: 8,
-          padding: '8px 0',
-          fontSize: 13,
-          cursor: 'pointer',
-        }}
-      >
-        ▦ 대시보드 열기
-      </button>
     </div>
   );
 }
