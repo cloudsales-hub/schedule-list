@@ -141,10 +141,11 @@ export function Widget({ store, hotkeyLabel, notice, onRaise, onOpenQuick, onOpe
         display: 'flex',
         flexDirection: 'column',
         padding: 14,
-        background: color.bg,
+        background: '#262629', // 검은 배경 위에서도 보이도록 한 단계 밝은 바탕과 밝은 테두리
+        border: '1.5px solid rgba(255,255,255,0.45)',
         color: color.text,
         fontFamily: font,
-        borderRadius: 12,
+        borderRadius: 14,
         overflow: 'hidden',
       }}
     >

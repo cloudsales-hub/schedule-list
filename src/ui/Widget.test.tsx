@@ -213,6 +213,15 @@ describe('Widget', () => {
     expect(screen.getByTestId('scroll-area').style.paddingRight).toBe('10px');
   });
 
+  test('어두운 배경에서도 보이도록 한 단계 밝은 바탕과 밝은 테두리를 가진다', () => {
+    setup([]);
+    expect(screen.getByTestId('widget-root')).toHaveStyle({
+      background: '#262629',
+      border: '1.5px solid rgba(255,255,255,0.45)',
+      borderRadius: '14px',
+    });
+  });
+
   test('창 높이를 가득 채우고, 위·아래 줄은 고정한 채 가운데 목록만 줄어든다', () => {
     setup([]);
     expect(screen.getByTestId('widget-root')).toHaveStyle({ height: '100vh', display: 'flex', flexDirection: 'column' });
