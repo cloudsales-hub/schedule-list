@@ -1,6 +1,6 @@
 import { useState, type CSSProperties, type DragEvent, type MouseEvent, type ReactNode } from 'react';
 import type { Item } from '../core/model';
-import { doneToday, plainTodos, upcomingEvents, urgentTasks } from '../core/selectors';
+import { doneToday, isUrgentTask, plainTodos, upcomingEvents, urgentTasks } from '../core/selectors';
 import type { ItemsStore } from '../core/store';
 import { DoneBadge, DoneToggle } from './DoneToggle';
 import { dueLabel } from './dueLabel';
@@ -45,6 +45,15 @@ const iconButton: CSSProperties = {
   alignItems: 'center',
 };
 
+/** 급한 것↔할일 이동 버튼: 글자가 있어 눈에 잘 띈다. */
+const moveButton: CSSProperties = {
+  ...iconButton,
+  border: '1px solid rgba(255,255,255,0.35)',
+  fontSize: 11,
+  padding: '2px 6px',
+  whiteSpace: 'nowrap',
+};
+
 /** X 모양 삭제 버튼. 마우스를 올리면 빨갛게 바뀐다. */
 function DeleteButton({ onClick }: { onClick(e: MouseEvent): void }) {
   const [hover, setHover] = useState(false);
@@ -70,7 +79,7 @@ function Row({ item, store, now, index }: { item: Item; store: ItemsStore; now: 
   const [draft, setDraft] = useState(item.text);
   // 완료한 항목과 일정은 끌 수 없다. 급한 것↔할일로 옮길 수 있는 건 할일뿐이다.
   const canDrag = !item.done && item.kind === 'task';
-  const autoUrgent = item.due !== null; // 마감이 있으면 저절로 급한 것
+  const inUrgent = isUrgentTask(item); // 지금 급한 것 칸에 있는지(마감이 있어 저절로 들어간 것 포함)
 
   const startEdit = () => {
     setDraft(item.text);
@@ -153,7 +162,7 @@ function Row({ item, store, now, index }: { item: Item; store: ItemsStore; now: 
         </span>
         )
       )}
-      {canDrag && !autoUrgent && item.urgent !== true && (
+      {canDrag && !inUrgent && (
         <button
           aria-label={`${item.text} 급한 것으로 올리기`}
           title="급한 것으로 올리기"
@@ -161,12 +170,12 @@ function Row({ item, store, now, index }: { item: Item; store: ItemsStore; now: 
             stop(e);
             void store.update(item.id, { urgent: true });
           }}
-          style={iconButton}
+          style={moveButton}
         >
-          🔥
+          🔥 급함
         </button>
       )}
-      {canDrag && !autoUrgent && item.urgent === true && (
+      {canDrag && inUrgent && (
         <button
           aria-label={`${item.text} 급한 것에서 내리기`}
           title="할일로 내리기"
@@ -174,9 +183,9 @@ function Row({ item, store, now, index }: { item: Item; store: ItemsStore; now: 
             stop(e);
             void store.update(item.id, { urgent: false });
           }}
-          style={iconButton}
+          style={moveButton}
         >
-          ⬇
+          ⬇ 할일
         </button>
       )}
       <DeleteButton
@@ -236,16 +245,16 @@ export function Widget({ store, hotkeyLabel, notice, onRaise, onOpenQuick, onOpe
     ...upcomingEvents(store.items, now).filter((i) => !i.done),
     ...doneToday(store.items, now).filter((i) => i.kind === 'event'),
   ];
-  const isUrgent = (i: Item) => i.due !== null || i.urgent === true;
+  const isUrgent = isUrgentTask;
   const urgentShown = withNumbers([...urgent, ...doneTasks.filter(isUrgent)]);
   const todosShown = withNumbers([...todos, ...doneTasks.filter((i) => !isUrgent(i))]);
 
-  // 할일 → 급한 것: 급함 표시를 붙인다. 급한 것 → 할일: 표시를 푼다(마감이 있는 항목은 마감 때문에 계속 급한 것에 남는다).
+  // 끌어 놓은 칸으로 옮긴다. 이미 그 칸에 있으면 아무 일도 하지 않는다.
   const moveTo = (id: string, target: 'urgent' | 'todo') => {
     const it = store.items.find((i) => i.id === id);
     if (!it || it.done || it.deleted || it.kind !== 'task') return;
-    if (target === 'urgent' && !isUrgent(it)) void store.update(id, { urgent: true });
-    if (target === 'todo' && it.urgent === true) void store.update(id, { urgent: false });
+    if (isUrgent(it) === (target === 'urgent')) return;
+    void store.update(id, { urgent: target === 'urgent' });
   };
 
   return (

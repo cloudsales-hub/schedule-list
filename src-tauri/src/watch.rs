@@ -10,9 +10,23 @@ pub fn should_emit(seen: &mut Option<String>, current: &Option<String>) -> bool 
     true
 }
 
+/// 파일을 쓴 창(`writer`)을 뺀 나머지 창의 이름. 창마다 따로 저장소를 갖고 있어서,
+/// 한 창이 저장하면 다른 창에 알려 줘야 목록이 바로 바뀐다.
+pub fn other_labels(labels: &[String], writer: &str) -> Vec<String> {
+    labels.iter().filter(|l| l.as_str() != writer).cloned().collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn 쓴_창을_뺀_나머지_창에만_알린다() {
+        let labels = vec!["widget".to_string(), "quick".to_string(), "settings".to_string()];
+        assert_eq!(other_labels(&labels, "quick"), vec!["widget".to_string(), "settings".to_string()]);
+        assert_eq!(other_labels(&labels, "unknown").len(), 3);
+        assert!(other_labels(&["quick".to_string()], "quick").is_empty());
+    }
 
     #[test]
     fn 처음_보는_내용이면_알린다() {

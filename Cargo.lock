@@ -3394,7 +3394,7 @@ dependencies = [
 
 [[package]]
 name = "schedule-app"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "datafile",
  "notify",

@@ -345,9 +345,29 @@ describe('Widget', () => {
       expect(store.update).toHaveBeenCalledWith(flagged.id, { urgent: false });
     });
 
-    test('마감이 있어 저절로 급한 것에 있는 항목에는 내리기 버튼이 없다', () => {
-      setup([item({ text: '견적서', due: '2026-11-21T10:00', hasTime: true })]);
-      expect(screen.queryByRole('button', { name: /급한 것에서 내리기/ })).toBeNull();
+    test('마감이 있어 저절로 급한 것에 있는 항목도 버튼과 끌기로 할일로 내릴 수 있다', () => {
+      const due = item({ text: '견적서', due: '2026-11-21T10:00', hasTime: true });
+      const { store } = setup([due]);
+      fireEvent.click(screen.getByRole('button', { name: '견적서 급한 것에서 내리기' }));
+      expect(store.update).toHaveBeenCalledWith(due.id, { urgent: false });
+      const transfer = dt();
+      fireEvent.dragStart(screen.getByText('견적서').closest('li')!, { dataTransfer: transfer });
+      fireEvent.drop(screen.getByTestId('todo-zone'), { dataTransfer: transfer });
+      expect(store.update).toHaveBeenCalledTimes(2);
+    });
+
+    test('마감이 있어도 할일로 내려 둔 항목은 올리기 버튼이 보인다', () => {
+      const lowered = item({ text: '견적서', due: '2026-11-21T10:00', hasTime: true, urgent: false });
+      const { store } = setup([lowered]);
+      expect(within(screen.getByTestId('todo-list')).getByText('견적서')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: '견적서 급한 것으로 올리기' }));
+      expect(store.update).toHaveBeenCalledWith(lowered.id, { urgent: true });
+    });
+
+    test('이동 버튼은 이모지만이 아니라 글자가 있어 눈에 잘 띈다', () => {
+      setup([item({ text: '메일 회신' }), item({ text: '전화하기', urgent: true })]);
+      expect(screen.getByRole('button', { name: '메일 회신 급한 것으로 올리기' })).toHaveTextContent('급함');
+      expect(screen.getByRole('button', { name: '전화하기 급한 것에서 내리기' })).toHaveTextContent('할일');
     });
 
     test('완료한 항목은 끌 수 없다', () => {

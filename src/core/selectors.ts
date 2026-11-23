@@ -6,8 +6,11 @@ const active = (it: Item) => !it.done && !it.deleted;
 
 const byDue = (a: Item, b: Item) => (a.due! < b.due! ? -1 : a.due! > b.due! ? 1 : 0);
 
-/** 급한 것에 들어가는 할일인가: 마감이 있거나, 직접 급함 표시를 한 것. */
-const isUrgentTask = (i: Item) => i.kind === 'task' && (i.due !== null || i.urgent === true);
+/**
+ * 급한 것에 들어가는 할일인가. 직접 옮긴 적이 있으면(urgent가 true/false) 그 선택을 따르고,
+ * 옮긴 적이 없으면(urgent 없음) 마감이 있는 할일이 저절로 급한 것에 들어간다.
+ */
+export const isUrgentTask = (i: Item) => i.kind === 'task' && (i.urgent ?? i.due !== null);
 
 /** 급한 것 목록 순서: 급함 표시만 있는 것(만든 순서)이 먼저, 그다음 마감 빠른 순. */
 const urgentOrder = (a: Item, b: Item) => {

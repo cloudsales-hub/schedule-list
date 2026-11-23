@@ -47,11 +47,18 @@ fn read_data(state: State<'_, AppState>) -> Result<Option<String>, String> {
 }
 
 #[tauri::command]
-fn write_data(state: State<'_, AppState>, text: String) -> Result<(), String> {
-    // 감시 이벤트가 오기 전에 먼저 맞춰 두어야 자기가 쓴 변경을 다시 알리지 않는다.
+fn write_data(app: AppHandle, window: tauri::Window, state: State<'_, AppState>, text: String) -> Result<(), String> {
+    // 감시 이벤트가 오기 전에 먼저 맞춰 두어야 자기가 쓴 변경을 파일 감시가 다시 알리지 않는다.
     *state.last_seen.lock().unwrap() = Some(text.clone());
     datafile::write_atomic(&state.data_file(), &text)
-        .map_err(|e| format!("데이터 파일을 저장하지 못했습니다: {e}"))
+        .map_err(|e| format!("데이터 파일을 저장하지 못했습니다: {e}"))?;
+    // 파일 감시는 앱이 직접 쓴 변경을 알리지 않으므로, 빠른 메모창처럼 다른 창이 저장한 내용은
+    // 여기서 나머지 창(위젯 등)에 직접 알려야 바로 보인다.
+    let labels: Vec<String> = app.webview_windows().keys().cloned().collect();
+    for label in watch::other_labels(&labels, window.label()) {
+        let _ = app.emit_to(label.as_str(), "data-changed", ());
+    }
+    Ok(())
 }
 
 #[tauri::command]

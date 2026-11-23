@@ -163,9 +163,16 @@ describe('급함 표시(urgent)', () => {
     expect(urgentTasks(items, now).map((i) => i.id)).toEqual(['f1', 'f2', 'due']);
   });
 
-  test('급함 표시를 풀어도 마감이 있으면 계속 급한 것에 남는다', () => {
-    const items = [mk({ id: 'a', due: '2026-11-25T00:00', urgent: false })];
+  test('표시를 건드리지 않은 마감 있는 할일은 저절로 급한 것에 들어간다', () => {
+    const items = [mk({ id: 'a', due: '2026-11-25T00:00' })];
     expect(urgentTasks(items, now).map((i) => i.id)).toEqual(['a']);
+    expect(plainTodos(items)).toEqual([]);
+  });
+
+  test('마감이 있어도 직접 할일로 내린 항목은 할일에 있다', () => {
+    const items = [mk({ id: 'a', due: '2026-11-25T00:00', urgent: false })];
+    expect(urgentTasks(items, now)).toEqual([]);
+    expect(plainTodos(items).map((i) => i.id)).toEqual(['a']);
   });
 
   test('일정은 급함 표시가 있어도 급한 것에 들어가지 않는다', () => {
