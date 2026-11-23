@@ -297,4 +297,104 @@ describe('Widget', () => {
     setup([], { status: 'error', error: '데이터 파일을 저장하지 못했습니다: disk full' });
     expect(screen.getByRole('alert')).toHaveTextContent('데이터 파일을 저장하지 못했습니다: disk full');
   });
+
+  describe('급한 것으로 옮기기', () => {
+    const dt = () => {
+      const data: Record<string, string> = {};
+      return { setData: (k: string, v: string) => (data[k] = v), getData: (k: string) => data[k] ?? '', effectAllowed: '', dropEffect: '' };
+    };
+
+    test('할일을 끌어 급한 것 칸에 놓으면 급함 표시가 붙는다', () => {
+      const todo = item({ text: '메일 회신' });
+      const { store } = setup([todo]);
+      const transfer = dt();
+      fireEvent.dragStart(screen.getByText('메일 회신').closest('li')!, { dataTransfer: transfer });
+      fireEvent.dragOver(screen.getByTestId('urgent-zone'), { dataTransfer: transfer });
+      fireEvent.drop(screen.getByTestId('urgent-zone'), { dataTransfer: transfer });
+      expect(store.update).toHaveBeenCalledWith(todo.id, { urgent: true });
+    });
+
+    test('급한 것을 끌어 할일 칸에 놓으면 급함 표시가 풀린다', () => {
+      const flagged = item({ text: '전화하기', urgent: true });
+      const { store } = setup([flagged]);
+      const transfer = dt();
+      fireEvent.dragStart(screen.getByText('전화하기').closest('li')!, { dataTransfer: transfer });
+      fireEvent.drop(screen.getByTestId('todo-zone'), { dataTransfer: transfer });
+      expect(store.update).toHaveBeenCalledWith(flagged.id, { urgent: false });
+    });
+
+    test('같은 칸에 놓거나, 목록에 없는 것을 놓으면 아무 일도 없다', () => {
+      const todo = item({ text: '메일 회신' });
+      const { store } = setup([todo]);
+      const transfer = dt();
+      fireEvent.dragStart(screen.getByText('메일 회신').closest('li')!, { dataTransfer: transfer });
+      fireEvent.drop(screen.getByTestId('todo-zone'), { dataTransfer: transfer });
+      const other = dt();
+      other.setData('text/plain', 'nope');
+      fireEvent.drop(screen.getByTestId('urgent-zone'), { dataTransfer: other });
+      expect(store.update).not.toHaveBeenCalled();
+    });
+
+    test('끌기가 어려울 때를 위해 🔥 버튼으로도 올리고 내릴 수 있다', async () => {
+      const todo = item({ text: '메일 회신' });
+      const flagged = item({ text: '전화하기', urgent: true });
+      const { store } = setup([todo, flagged]);
+      fireEvent.click(screen.getByRole('button', { name: '메일 회신 급한 것으로 올리기' }));
+      expect(store.update).toHaveBeenCalledWith(todo.id, { urgent: true });
+      fireEvent.click(screen.getByRole('button', { name: '전화하기 급한 것에서 내리기' }));
+      expect(store.update).toHaveBeenCalledWith(flagged.id, { urgent: false });
+    });
+
+    test('마감이 있어 저절로 급한 것에 있는 항목에는 내리기 버튼이 없다', () => {
+      setup([item({ text: '견적서', due: '2026-11-21T10:00', hasTime: true })]);
+      expect(screen.queryByRole('button', { name: /급한 것에서 내리기/ })).toBeNull();
+    });
+
+    test('완료한 항목은 끌 수 없다', () => {
+      setup([item({ text: '끝난 일', done: true, updatedAt: NOW.getTime() })]);
+      expect(screen.getByText('끝난 일').closest('li')).toHaveAttribute('draggable', 'false');
+    });
+  });
+
+  describe('번호', () => {
+    const numbers = (id: string) =>
+      within(screen.getByTestId(id))
+        .queryAllByTestId('row-number')
+        .map((n) => n.textContent);
+
+    test('할일은 작성한 순서대로 1부터 번호가 붙는다', () => {
+      setup([item({ text: '가', createdAt: 3 }), item({ text: '나', createdAt: 1 }), item({ text: '다', createdAt: 2 })]);
+      const rows = within(screen.getByTestId('todo-list')).getAllByTestId('row');
+      expect(rows.map((r) => r.textContent?.replace(/[^가-힣0-9]/g, '').slice(0, 2))).toEqual(['1나', '2다', '3가']);
+      expect(numbers('todo-list')).toEqual(['1', '2', '3']);
+    });
+
+    test('완료하면 그 항목은 번호가 없어지고 나머지 번호가 당겨진다', () => {
+      setup([
+        item({ text: '가', createdAt: 1 }),
+        item({ text: '나', createdAt: 2, done: true, updatedAt: NOW.getTime() }),
+        item({ text: '다', createdAt: 3 }),
+      ]);
+      expect(numbers('todo-list')).toEqual(['1', '2']);
+    });
+
+    test('급한 것으로 올리면 두 목록 모두 번호가 다시 매겨진다', () => {
+      setup([item({ text: '가', createdAt: 1 }), item({ text: '나', createdAt: 2, urgent: true }), item({ text: '다', createdAt: 3 })]);
+      expect(numbers('urgent-list')).toEqual(['1']);
+      expect(numbers('todo-list')).toEqual(['1', '2']);
+    });
+
+    test('일정에는 번호를 붙이지 않는다', () => {
+      setup([item({ text: '회의', kind: 'event', due: '2026-11-20T14:00', hasTime: true })]);
+      expect(within(screen.getByTestId('event-list')).queryAllByTestId('row-number')).toEqual([]);
+    });
+  });
+
+  test('삭제 버튼은 선명한 X 모양이다', () => {
+    setup([item({ text: '가' })]);
+    const del = screen.getByRole('button', { name: '삭제' });
+    expect(del.querySelector('svg')).not.toBeNull();
+    expect(del.textContent).toBe('');
+    expect(del).toHaveStyle({ color: '#e0e0e0' });
+  });
 });

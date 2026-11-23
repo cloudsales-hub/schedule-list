@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type MouseEvent } from 'react';
+import { useState, type CSSProperties, type DragEvent, type MouseEvent, type ReactNode } from 'react';
 import type { Item } from '../core/model';
 import { doneToday, plainTodos, upcomingEvents, urgentTasks } from '../core/selectors';
 import type { ItemsStore } from '../core/store';
@@ -29,10 +29,48 @@ const listStyle: CSSProperties = {
   listStyle: 'none',
 };
 
-function Row({ item, store, now }: { item: Item; store: ItemsStore; now: Date }) {
+const ICON = '#e0e0e0'; // 어두운 바탕에서도 또렷하게 보이는 아이콘 색
+
+const iconButton: CSSProperties = {
+  background: 'transparent',
+  border: 'none',
+  color: ICON,
+  cursor: 'pointer',
+  fontSize: 13,
+  lineHeight: 1,
+  padding: 4,
+  borderRadius: 6,
+  flexShrink: 0,
+  display: 'inline-flex',
+  alignItems: 'center',
+};
+
+/** X 모양 삭제 버튼. 마우스를 올리면 빨갛게 바뀐다. */
+function DeleteButton({ onClick }: { onClick(e: MouseEvent): void }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <button
+      aria-label="삭제"
+      title="삭제"
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{ ...iconButton, color: hover ? color.red : ICON, background: hover ? 'rgba(255,107,107,0.18)' : 'transparent' }}
+    >
+      <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+        <path d="M2 2 L10 10 M10 2 L2 10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" fill="none" />
+      </svg>
+    </button>
+  );
+}
+
+function Row({ item, store, now, index }: { item: Item; store: ItemsStore; now: Date; index?: number | null }) {
   const label = dueLabel(item, now);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(item.text);
+  // 완료한 항목과 일정은 끌 수 없다. 급한 것↔할일로 옮길 수 있는 건 할일뿐이다.
+  const canDrag = !item.done && item.kind === 'task';
+  const autoUrgent = item.due !== null; // 마감이 있으면 저절로 급한 것
 
   const startEdit = () => {
     setDraft(item.text);
@@ -46,7 +84,20 @@ function Row({ item, store, now }: { item: Item; store: ItemsStore; now: Date })
   };
 
   return (
-    <li data-testid="row" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', fontSize: 13 }}>
+    <li
+      data-testid="row"
+      draggable={canDrag && !editing}
+      onDragStart={(e: DragEvent) => {
+        e.dataTransfer.setData('text/plain', item.id);
+        e.dataTransfer.effectAllowed = 'move';
+      }}
+      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', fontSize: 13 }}
+    >
+      {index !== undefined && (
+        <span data-testid={index === null ? undefined : 'row-number'} style={{ width: 16, flexShrink: 0, textAlign: 'right', fontSize: 11, color: color.sub }}>
+          {index}
+        </span>
+      )}
       <DoneToggle
         done={item.done}
         label={`${item.text} ${item.done ? '완료 취소' : '완료'}`}
@@ -102,19 +153,76 @@ function Row({ item, store, now }: { item: Item; store: ItemsStore; now: Date })
         </span>
         )
       )}
-      <button
-        aria-label="삭제"
-        title="삭제"
+      {canDrag && !autoUrgent && item.urgent !== true && (
+        <button
+          aria-label={`${item.text} 급한 것으로 올리기`}
+          title="급한 것으로 올리기"
+          onClick={(e) => {
+            stop(e);
+            void store.update(item.id, { urgent: true });
+          }}
+          style={iconButton}
+        >
+          🔥
+        </button>
+      )}
+      {canDrag && !autoUrgent && item.urgent === true && (
+        <button
+          aria-label={`${item.text} 급한 것에서 내리기`}
+          title="할일로 내리기"
+          onClick={(e) => {
+            stop(e);
+            void store.update(item.id, { urgent: false });
+          }}
+          style={iconButton}
+        >
+          ⬇
+        </button>
+      )}
+      <DeleteButton
         onClick={(e) => {
           stop(e);
           void store.remove(item.id);
         }}
-        style={{ background: 'transparent', border: 'none', color: color.sub, cursor: 'pointer', fontSize: 12, padding: 0, flexShrink: 0 }}
-      >
-        🗑
-      </button>
+      />
     </li>
   );
+}
+
+/** 끌어 온 항목을 놓을 수 있는 칸. 위에 올리면 점선 테두리가 보인다. */
+function Zone({ testId, onDropId, children }: { testId: string; onDropId(id: string): void; children: ReactNode }) {
+  const [over, setOver] = useState(false);
+  return (
+    <div
+      data-testid={testId}
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        setOver(true);
+      }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setOver(false);
+        const id = e.dataTransfer.getData('text/plain');
+        if (id) onDropId(id);
+      }}
+      style={{
+        minHeight: 28,
+        borderRadius: 8,
+        outline: over ? `2px dashed ${color.blue}` : '2px dashed transparent',
+        outlineOffset: 2,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+/** 완료하지 않은 항목에만 1부터 번호를 붙이고, 완료한 항목은 번호 칸만 비워 둔다. */
+function withNumbers(list: Item[]): { it: Item; n: number | null }[] {
+  let n = 0;
+  return list.map((it) => ({ it, n: it.done ? null : ++n }));
 }
 
 export function Widget({ store, hotkeyLabel, notice, onRaise, onOpenQuick, onOpenSettings }: Props) {
@@ -128,8 +236,17 @@ export function Widget({ store, hotkeyLabel, notice, onRaise, onOpenQuick, onOpe
     ...upcomingEvents(store.items, now).filter((i) => !i.done),
     ...doneToday(store.items, now).filter((i) => i.kind === 'event'),
   ];
-  const urgentShown = [...urgent, ...doneTasks.filter((i) => i.due !== null)];
-  const todosShown = [...todos, ...doneTasks.filter((i) => i.due === null)];
+  const isUrgent = (i: Item) => i.due !== null || i.urgent === true;
+  const urgentShown = withNumbers([...urgent, ...doneTasks.filter(isUrgent)]);
+  const todosShown = withNumbers([...todos, ...doneTasks.filter((i) => !isUrgent(i))]);
+
+  // 할일 → 급한 것: 급함 표시를 붙인다. 급한 것 → 할일: 표시를 푼다(마감이 있는 항목은 마감 때문에 계속 급한 것에 남는다).
+  const moveTo = (id: string, target: 'urgent' | 'todo') => {
+    const it = store.items.find((i) => i.id === id);
+    if (!it || it.done || it.deleted || it.kind !== 'task') return;
+    if (target === 'urgent' && !isUrgent(it)) void store.update(id, { urgent: true });
+    if (target === 'todo' && it.urgent === true) void store.update(id, { urgent: false });
+  };
 
   return (
     <div
@@ -222,19 +339,23 @@ export function Widget({ store, hotkeyLabel, notice, onRaise, onOpenQuick, onOpe
         </>
       )}
 
-      <h3 style={{ fontSize: 12, color: color.sub, margin: '8px 0 4px' }}>🔥 급한 것</h3>
-      <ul data-testid="urgent-list" style={listStyle}>
-        {urgentShown.map((it) => (
-          <Row key={it.id} item={it} store={store} now={now} />
-        ))}
-      </ul>
+      <Zone testId="urgent-zone" onDropId={(id) => moveTo(id, 'urgent')}>
+        <h3 style={{ fontSize: 12, color: color.sub, margin: '8px 0 4px' }}>🔥 급한 것</h3>
+        <ul data-testid="urgent-list" style={listStyle}>
+          {urgentShown.map(({ it, n }) => (
+            <Row key={it.id} item={it} store={store} now={now} index={n} />
+          ))}
+        </ul>
+      </Zone>
 
-      <h3 style={{ fontSize: 12, color: color.sub, margin: '12px 0 4px' }}>📝 할일 ({todos.length})</h3>
-      <ul data-testid="todo-list" style={listStyle}>
-        {todosShown.map((it) => (
-          <Row key={it.id} item={it} store={store} now={now} />
-        ))}
-      </ul>
+      <Zone testId="todo-zone" onDropId={(id) => moveTo(id, 'todo')}>
+        <h3 style={{ fontSize: 12, color: color.sub, margin: '12px 0 4px' }}>📝 할일 ({todos.length})</h3>
+        <ul data-testid="todo-list" style={listStyle}>
+          {todosShown.map(({ it, n }) => (
+            <Row key={it.id} item={it} store={store} now={now} index={n} />
+          ))}
+        </ul>
+      </Zone>
       </div>
       </div>
 

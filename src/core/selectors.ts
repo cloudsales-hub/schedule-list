@@ -6,22 +6,33 @@ const active = (it: Item) => !it.done && !it.deleted;
 
 const byDue = (a: Item, b: Item) => (a.due! < b.due! ? -1 : a.due! > b.due! ? 1 : 0);
 
-/** 마감 있는 할일, 마감 빠른 순. 이미 지난 것도 포함한다. */
+/** 급한 것에 들어가는 할일인가: 마감이 있거나, 직접 급함 표시를 한 것. */
+const isUrgentTask = (i: Item) => i.kind === 'task' && (i.due !== null || i.urgent === true);
+
+/** 급한 것 목록 순서: 급함 표시만 있는 것(만든 순서)이 먼저, 그다음 마감 빠른 순. */
+const urgentOrder = (a: Item, b: Item) => {
+  if (a.due === null && b.due === null) return a.createdAt - b.createdAt;
+  if (a.due === null) return -1;
+  if (b.due === null) return 1;
+  return byDue(a, b);
+};
+
+/** 급한 할일: 마감이 있거나 급함 표시를 한 할일. 이미 지난 것도 포함한다. */
 export function urgentTasks(items: Item[], _now: Date): Item[] {
-  return items.filter((i) => active(i) && i.kind === 'task' && i.due !== null).sort(byDue);
+  return items.filter((i) => active(i) && isUrgentTask(i)).sort(urgentOrder);
 }
 
 /** urgentTasks 중 마감이 (오늘 + 7일) 끝 이전인 것. */
 export function soonTasks(items: Item[], now: Date): Item[] {
   const limit = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7, 23, 59);
   const limitIso = toLocalIso(limit);
-  return urgentTasks(items, now).filter((i) => i.due! <= limitIso);
+  return urgentTasks(items, now).filter((i) => i.due !== null && i.due <= limitIso);
 }
 
-/** 마감 없는 할일, 만든 순서(오래된 것 먼저). */
+/** 마감도 급함 표시도 없는 할일, 만든 순서(오래된 것 먼저). */
 export function plainTodos(items: Item[]): Item[] {
   return items
-    .filter((i) => active(i) && i.kind === 'task' && i.due === null)
+    .filter((i) => active(i) && i.kind === 'task' && !isUrgentTask(i))
     .sort((a, b) => a.createdAt - b.createdAt);
 }
 

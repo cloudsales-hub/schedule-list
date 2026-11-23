@@ -71,10 +71,9 @@ const { fit, userResized } = createAutoHeight({
     await win.setSize(new LogicalSize((await logicalSize()).width, height));
   },
   setMaxHeight: async (height) => {
-    const { width } = await logicalSize();
-    // 가로 크기는 고정하고 세로만 늘리고 줄일 수 있게 한다.
-    await win.setMinSize(new LogicalSize(width, 180));
-    await win.setMaxSize(new LogicalSize(width, height));
+    // 가로는 좁게(240px)부터 화면 너비까지 자유롭게, 세로는 내용이 다 보이는 높이까지만 늘릴 수 있게 한다.
+    await win.setMinSize(new LogicalSize(240, 180));
+    await win.setMaxSize(new LogicalSize(Math.max(300, window.screen.availWidth), height));
   },
   loadPref: () => {
     try {

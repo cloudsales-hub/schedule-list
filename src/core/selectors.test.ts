@@ -143,3 +143,38 @@ describe('doneToday', () => {
     expect(doneToday(items, new Date('2026-11-21T00:01'))).toEqual([]);
   });
 });
+
+describe('급함 표시(urgent)', () => {
+  test('마감이 없어도 급함 표시가 있으면 급한 것에 들어가고 할일에서는 빠진다', () => {
+    const items = [
+      mk({ id: 'plain', createdAt: 1 }),
+      mk({ id: 'flagged', createdAt: 2, urgent: true }),
+    ];
+    expect(urgentTasks(items, now).map((i) => i.id)).toEqual(['flagged']);
+    expect(plainTodos(items).map((i) => i.id)).toEqual(['plain']);
+  });
+
+  test('급함 표시만 있는 것은 마감 있는 것보다 위에, 만든 순서대로 놓는다', () => {
+    const items = [
+      mk({ id: 'due', due: '2026-11-20T10:00', hasTime: true, createdAt: 1 }),
+      mk({ id: 'f2', urgent: true, createdAt: 3 }),
+      mk({ id: 'f1', urgent: true, createdAt: 2 }),
+    ];
+    expect(urgentTasks(items, now).map((i) => i.id)).toEqual(['f1', 'f2', 'due']);
+  });
+
+  test('급함 표시를 풀어도 마감이 있으면 계속 급한 것에 남는다', () => {
+    const items = [mk({ id: 'a', due: '2026-11-25T00:00', urgent: false })];
+    expect(urgentTasks(items, now).map((i) => i.id)).toEqual(['a']);
+  });
+
+  test('일정은 급함 표시가 있어도 급한 것에 들어가지 않는다', () => {
+    const items = [mk({ id: 'e', kind: 'event', due: '2026-11-20T10:00', urgent: true })];
+    expect(urgentTasks(items, now)).toEqual([]);
+  });
+
+  test('마감 없는 급한 항목이 있어도 임박 목록(soonTasks)은 오류 없이 마감 있는 것만 돌려준다', () => {
+    const items = [mk({ id: 'f', urgent: true }), mk({ id: 'd', due: '2026-11-21T09:00' })];
+    expect(soonTasks(items, now).map((i) => i.id)).toEqual(['d']);
+  });
+});

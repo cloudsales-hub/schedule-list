@@ -9,6 +9,8 @@ export interface Item {
   hasTime: boolean;
   done: boolean;
   deleted: boolean;
+  /** 마감이 없어도 직접 급한 것으로 올렸는지. 없으면(옛 데이터) false로 본다. */
+  urgent?: boolean;
   /** epoch ms */
   createdAt: number;
   updatedAt: number;
@@ -21,7 +23,7 @@ export interface NewItem {
   hasTime: boolean;
 }
 
-export type ItemPatch = Partial<Pick<Item, 'text' | 'kind' | 'due' | 'hasTime' | 'done' | 'deleted'>>;
+export type ItemPatch = Partial<Pick<Item, 'text' | 'kind' | 'due' | 'hasTime' | 'done' | 'deleted' | 'urgent'>>;
 
 export function createItem(p: NewItem, now: Date): Item {
   return {
