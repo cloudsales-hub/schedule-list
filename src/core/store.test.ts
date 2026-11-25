@@ -245,4 +245,21 @@ describe('subscribe', () => {
     await store.whenIdle();
     expect(store.items).toEqual([]);
   });
+
+  test('updateMany는 여러 항목을 한 번에 고치고 파일에도 한 번만 쓴다', async () => {
+    const backend = new FakeBackend();
+    const store = new ItemsStore(backend);
+    await store.load();
+    await store.add({ text: 'a', kind: 'task', due: null, hasTime: false });
+    await store.add({ text: 'b', kind: 'task', due: null, hasTime: false });
+    const [a, b] = store.items;
+    const before = backend.writes;
+    await store.updateMany([
+      { id: a.id, patch: { order: 2000 } },
+      { id: b.id, patch: { order: 1000, urgent: true } },
+    ]);
+    expect(backend.writes).toBe(before + 1);
+    expect(backend.fileItems.find((i) => i.id === a.id)?.order).toBe(2000);
+    expect(backend.fileItems.find((i) => i.id === b.id)).toMatchObject({ order: 1000, urgent: true });
+  });
 });

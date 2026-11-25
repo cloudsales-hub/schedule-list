@@ -11,6 +11,8 @@ export interface Item {
   deleted: boolean;
   /** 마감이 없어도 직접 급한 것으로 올렸는지. 없으면(옛 데이터) false로 본다. */
   urgent?: boolean;
+  /** 직접 끌어서 정한 순서(작을수록 위). 없으면 기본 순서를 따르고, 정한 것들 뒤에 놓인다. */
+  order?: number;
   /** epoch ms */
   createdAt: number;
   updatedAt: number;
@@ -23,7 +25,7 @@ export interface NewItem {
   hasTime: boolean;
 }
 
-export type ItemPatch = Partial<Pick<Item, 'text' | 'kind' | 'due' | 'hasTime' | 'done' | 'deleted' | 'urgent'>>;
+export type ItemPatch = Partial<Pick<Item, 'text' | 'kind' | 'due' | 'hasTime' | 'done' | 'deleted' | 'urgent' | 'order'>>;
 
 export function createItem(p: NewItem, now: Date): Item {
   return {

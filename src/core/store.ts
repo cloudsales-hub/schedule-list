@@ -75,6 +75,14 @@ export class ItemsStore {
     );
   }
 
+  /** 여러 항목을 한 번에 고친다. 파일은 한 번만 읽고 쓴다. */
+  updateMany(changes: { id: string; patch: ItemPatch }[]): Promise<void> {
+    const byId = new Map(changes.map((c) => [c.id, c.patch]));
+    return this.enqueue(() =>
+      this.sync((items) => items.map((it) => (byId.has(it.id) ? updateItem(it, byId.get(it.id)!, this.now()) : it))),
+    );
+  }
+
   /** 삭제 표시만 한다. 실제 정리는 30일 뒤에 병합 과정에서 이루어진다. */
   remove(id: string): Promise<void> {
     return this.update(id, { deleted: true });

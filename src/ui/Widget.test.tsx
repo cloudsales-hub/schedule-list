@@ -32,9 +32,10 @@ function fakeStore(items: Item[], extra: Partial<{ status: string; error: string
     subscribe: () => () => {},
     add: vi.fn().mockResolvedValue(undefined),
     update: vi.fn().mockResolvedValue(undefined),
+    updateMany: vi.fn().mockResolvedValue(undefined),
     ...extra,
   };
-  return store as unknown as ItemsStore & { add: ReturnType<typeof vi.fn>; update: ReturnType<typeof vi.fn> };
+  return store as unknown as ItemsStore & { add: ReturnType<typeof vi.fn>; update: ReturnType<typeof vi.fn>; updateMany: ReturnType<typeof vi.fn> };
 }
 
 function setup(items: Item[], extra = {}, onRaise: () => void = () => {}) {
@@ -46,6 +47,14 @@ function setup(items: Item[], extra = {}, onRaise: () => void = () => {}) {
   render(<Widget store={store} hotkeyLabel="Alt+~" onRaise={onRaise} onOpenQuick={onOpenQuick} onOpenSettings={onOpenSettings} />);
   return { store, onOpenQuick, onOpenSettings };
 }
+
+type Fake = ReturnType<typeof fakeStore>;
+type Patch = { id: string; patch: Record<string, unknown> };
+/** 한꺼번에 저장 요청된 변경 중 해당 항목의 가장 최근 변경 내용 */
+const patchOf = (store: Fake, id: string) =>
+  (store.updateMany.mock.calls.flatMap((c) => c[0] as Patch[]) as Patch[]).reverse().find((p) => p.id === id)?.patch;
+/** 마지막 저장 요청을 (항목 id → 새 순번) 순서대로 */
+const lastOrders = (store: Fake) => (store.updateMany.mock.calls.at(-1)![0] as Patch[]).map((p) => [p.id, p.patch.order]);
 
 afterEach(() => {
   vi.useRealTimers();
@@ -311,7 +320,7 @@ describe('Widget', () => {
       fireEvent.dragStart(screen.getByText('메일 회신').closest('li')!, { dataTransfer: transfer });
       fireEvent.dragOver(screen.getByTestId('urgent-zone'), { dataTransfer: transfer });
       fireEvent.drop(screen.getByTestId('urgent-zone'), { dataTransfer: transfer });
-      expect(store.update).toHaveBeenCalledWith(todo.id, { urgent: true });
+      expect(patchOf(store, todo.id)).toMatchObject({ urgent: true });
     });
 
     test('급한 것을 끌어 할일 칸에 놓으면 급함 표시가 풀린다', () => {
@@ -320,7 +329,7 @@ describe('Widget', () => {
       const transfer = dt();
       fireEvent.dragStart(screen.getByText('전화하기').closest('li')!, { dataTransfer: transfer });
       fireEvent.drop(screen.getByTestId('todo-zone'), { dataTransfer: transfer });
-      expect(store.update).toHaveBeenCalledWith(flagged.id, { urgent: false });
+      expect(patchOf(store, flagged.id)).toMatchObject({ urgent: false });
     });
 
     test('같은 칸에 놓거나, 목록에 없는 것을 놓으면 아무 일도 없다', () => {
@@ -333,6 +342,7 @@ describe('Widget', () => {
       other.setData('text/plain', 'nope');
       fireEvent.drop(screen.getByTestId('urgent-zone'), { dataTransfer: other });
       expect(store.update).not.toHaveBeenCalled();
+      expect(store.updateMany).not.toHaveBeenCalled();
     });
 
     test('끌기가 어려울 때를 위해 🔥 버튼으로도 올리고 내릴 수 있다', async () => {
@@ -340,20 +350,20 @@ describe('Widget', () => {
       const flagged = item({ text: '전화하기', urgent: true });
       const { store } = setup([todo, flagged]);
       fireEvent.click(screen.getByRole('button', { name: '메일 회신 급한 것으로 올리기' }));
-      expect(store.update).toHaveBeenCalledWith(todo.id, { urgent: true });
+      expect(patchOf(store, todo.id)).toMatchObject({ urgent: true });
       fireEvent.click(screen.getByRole('button', { name: '전화하기 급한 것에서 내리기' }));
-      expect(store.update).toHaveBeenCalledWith(flagged.id, { urgent: false });
+      expect(patchOf(store, flagged.id)).toMatchObject({ urgent: false });
     });
 
     test('마감이 있어 저절로 급한 것에 있는 항목도 버튼과 끌기로 할일로 내릴 수 있다', () => {
       const due = item({ text: '견적서', due: '2026-11-21T10:00', hasTime: true });
       const { store } = setup([due]);
       fireEvent.click(screen.getByRole('button', { name: '견적서 급한 것에서 내리기' }));
-      expect(store.update).toHaveBeenCalledWith(due.id, { urgent: false });
+      expect(patchOf(store, due.id)).toMatchObject({ urgent: false });
       const transfer = dt();
       fireEvent.dragStart(screen.getByText('견적서').closest('li')!, { dataTransfer: transfer });
       fireEvent.drop(screen.getByTestId('todo-zone'), { dataTransfer: transfer });
-      expect(store.update).toHaveBeenCalledTimes(2);
+      expect(store.updateMany).toHaveBeenCalledTimes(2);
     });
 
     test('마감이 있어도 할일로 내려 둔 항목은 올리기 버튼이 보인다', () => {
@@ -361,7 +371,7 @@ describe('Widget', () => {
       const { store } = setup([lowered]);
       expect(within(screen.getByTestId('todo-list')).getByText('견적서')).toBeInTheDocument();
       fireEvent.click(screen.getByRole('button', { name: '견적서 급한 것으로 올리기' }));
-      expect(store.update).toHaveBeenCalledWith(lowered.id, { urgent: true });
+      expect(patchOf(store, lowered.id)).toMatchObject({ urgent: true });
     });
 
     test('이동 버튼은 이모지만이 아니라 글자가 있어 눈에 잘 띈다', () => {
@@ -416,5 +426,88 @@ describe('Widget', () => {
     expect(del.querySelector('svg')).not.toBeNull();
     expect(del.textContent).toBe('');
     expect(del).toHaveStyle({ color: '#e0e0e0' });
+  });
+
+  describe('같은 칸 안에서 순서 바꾸기', () => {
+    const dt = () => {
+      const data: Record<string, string> = {};
+      return { setData: (k: string, v: string) => (data[k] = v), getData: (k: string) => data[k] ?? '', effectAllowed: '', dropEffect: '' };
+    };
+    const rowOf = (text: string) => screen.getByText(text).closest('li')!;
+    const dragOnto = (from: string, onto: HTMLElement) => {
+      const transfer = dt();
+      fireEvent.dragStart(rowOf(from), { dataTransfer: transfer });
+      fireEvent.dragOver(onto, { dataTransfer: transfer });
+      fireEvent.drop(onto, { dataTransfer: transfer });
+    };
+
+    test('항목을 다른 항목 위에 놓으면 그 앞으로 들어가고 순번이 새로 매겨진다', () => {
+      const [a, b, c] = [item({ text: '가', createdAt: 1 }), item({ text: '나', createdAt: 2 }), item({ text: '다', createdAt: 3 })];
+      const { store } = setup([a, b, c]);
+      dragOnto('다', rowOf('가'));
+      expect(lastOrders(store)).toEqual([[c.id, 1000], [a.id, 2000], [b.id, 3000]]);
+    });
+
+    test('아래로 옮길 때도 놓은 항목의 앞에 들어간다', () => {
+      const [a, b, c] = [item({ text: '가', createdAt: 1 }), item({ text: '나', createdAt: 2 }), item({ text: '다', createdAt: 3 })];
+      const { store } = setup([a, b, c]);
+      dragOnto('가', rowOf('다'));
+      expect(lastOrders(store)).toEqual([[b.id, 1000], [a.id, 2000], [c.id, 3000]]);
+    });
+
+    test('칸의 빈 곳(제목 줄 등)에 놓으면 맨 끝으로 간다', () => {
+      const [a, b, c] = [item({ text: '가', createdAt: 1 }), item({ text: '나', createdAt: 2 }), item({ text: '다', createdAt: 3 })];
+      const { store } = setup([a, b, c]);
+      dragOnto('가', screen.getByTestId('todo-zone'));
+      expect(lastOrders(store)).toEqual([[b.id, 1000], [c.id, 2000], [a.id, 3000]]);
+    });
+
+    test('자기 자리에 놓거나 이미 맨 끝인 것을 끝에 놓으면 저장하지 않는다', () => {
+      const [a, b] = [item({ text: '가', createdAt: 1 }), item({ text: '나', createdAt: 2 })];
+      const { store } = setup([a, b]);
+      dragOnto('가', rowOf('가'));
+      dragOnto('나', screen.getByTestId('todo-zone'));
+      dragOnto('가', rowOf('나')); // 가는 이미 나의 바로 앞이다
+      expect(store.updateMany).not.toHaveBeenCalled();
+    });
+
+    test('이미 정해 둔 순서가 있으면 그 순서를 기준으로 다시 정한다', () => {
+      const [a, b, c] = [item({ text: '가', order: 2000 }), item({ text: '나', order: 1000 }), item({ text: '다', createdAt: 99 })];
+      const { store } = setup([a, b, c]); // 화면 순서: 나, 가, 다
+      dragOnto('다', rowOf('나'));
+      expect(lastOrders(store)).toEqual([[c.id, 1000], [b.id, 2000], [a.id, 3000]]);
+    });
+
+    test('일정끼리도 순서를 바꿀 수 있다', () => {
+      const e1 = item({ text: '회의1', kind: 'event', due: '2026-11-20T10:00', hasTime: true });
+      const e2 = item({ text: '회의2', kind: 'event', due: '2026-11-20T14:00', hasTime: true });
+      const { store } = setup([e1, e2]);
+      dragOnto('회의2', rowOf('회의1'));
+      expect(lastOrders(store)).toEqual([[e2.id, 1000], [e1.id, 2000]]);
+    });
+
+    test('일정은 급한 것이나 할일 칸으로 옮길 수 없다', () => {
+      const e1 = item({ text: '회의', kind: 'event', due: '2026-11-20T10:00', hasTime: true });
+      const { store } = setup([e1, item({ text: '가' })]);
+      dragOnto('회의', screen.getByTestId('urgent-zone'));
+      dragOnto('회의', rowOf('가'));
+      expect(store.updateMany).not.toHaveBeenCalled();
+    });
+
+    test('다른 칸의 항목 위에 놓으면 그 칸으로 옮겨지면서 그 앞에 들어간다', () => {
+      const flagged = item({ text: '급함', urgent: true, createdAt: 1 });
+      const todo = item({ text: '할것', createdAt: 2 });
+      const { store } = setup([flagged, todo]);
+      dragOnto('할것', rowOf('급함'));
+      expect(patchOf(store, todo.id)).toEqual({ urgent: true, order: 1000 });
+      expect(patchOf(store, flagged.id)).toEqual({ order: 2000 });
+    });
+
+    test('완료한 항목은 순서 바꾸기의 대상이 아니다', () => {
+      const done = item({ text: '끝', done: true, updatedAt: NOW.getTime() });
+      const { store } = setup([done, item({ text: '가' })]);
+      dragOnto('가', rowOf('끝'));
+      expect(store.updateMany).not.toHaveBeenCalled();
+    });
   });
 });

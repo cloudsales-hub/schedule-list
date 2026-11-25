@@ -185,3 +185,32 @@ describe('급함 표시(urgent)', () => {
     expect(soonTasks(items, now).map((i) => i.id)).toEqual(['d']);
   });
 });
+
+describe('직접 정한 순서(order)', () => {
+  test('할일: order가 있는 것이 먼저 order 순, 없는 것은 그 뒤에 만든 순서', () => {
+    const items = [
+      mk({ id: 'new', createdAt: 9 }),
+      mk({ id: 'b', createdAt: 1, order: 2000 }),
+      mk({ id: 'a', createdAt: 5, order: 1000 }),
+      mk({ id: 'old', createdAt: 2 }),
+    ];
+    expect(plainTodos(items).map((i) => i.id)).toEqual(['a', 'b', 'old', 'new']);
+  });
+
+  test('급한 것: order가 있는 것이 먼저, 없는 것은 원래 규칙(급함 표시 → 마감순)', () => {
+    const items = [
+      mk({ id: 'due', due: '2026-11-21T09:00' }),
+      mk({ id: 'flag', urgent: true, createdAt: 5 }),
+      mk({ id: 'manual', due: '2026-12-31T09:00', order: 1000 }),
+    ];
+    expect(urgentTasks(items, now).map((i) => i.id)).toEqual(['manual', 'flag', 'due']);
+  });
+
+  test('일정: order가 있으면 시간순보다 우선한다', () => {
+    const items = [
+      mk({ id: 'early', kind: 'event', due: '2026-11-20T09:00' }),
+      mk({ id: 'late', kind: 'event', due: '2026-11-20T18:00', order: 1000 }),
+    ];
+    expect(upcomingEvents(items, now).map((i) => i.id)).toEqual(['late', 'early']);
+  });
+});

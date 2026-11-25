@@ -1,5 +1,5 @@
 import { useState, type CSSProperties, type DragEvent, type MouseEvent, type ReactNode } from 'react';
-import type { Item } from '../core/model';
+import type { Item, ItemPatch } from '../core/model';
 import { doneToday, isUrgentTask, plainTodos, upcomingEvents, urgentTasks } from '../core/selectors';
 import type { ItemsStore } from '../core/store';
 import { DoneBadge, DoneToggle } from './DoneToggle';
@@ -73,12 +73,30 @@ function DeleteButton({ onClick }: { onClick(e: MouseEvent): void }) {
   );
 }
 
-function Row({ item, store, now, index }: { item: Item; store: ItemsStore; now: Date; index?: number | null }) {
+interface RowProps {
+  item: Item;
+  store: ItemsStore;
+  now: Date;
+  index?: number | null;
+  /** 지금 끌고 있는 항목 */
+  dragging: Item | null;
+  canDropOn(target: Item): boolean;
+  onDragStartItem(id: string): void;
+  onDragEndItem(): void;
+  /** 끌어 온 항목을 이 행 위에 놓았다(이 행 앞으로 들어간다) */
+  onDropOnto(draggedId: string, target: Item): void;
+  /** 급한 것↔할일 버튼 */
+  onMove(item: Item, target: 'urgent' | 'todo'): void;
+}
+
+function Row({ item, store, now, index, dragging, canDropOn, onDragStartItem, onDragEndItem, onDropOnto, onMove }: RowProps) {
+  const [over, setOver] = useState(false);
   const label = dueLabel(item, now);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(item.text);
-  // 완료한 항목과 일정은 끌 수 없다. 급한 것↔할일로 옮길 수 있는 건 할일뿐이다.
-  const canDrag = !item.done && item.kind === 'task';
+  // 완료한 항목은 끌 수 없다. 일정은 일정끼리만, 할일은 급한 것·할일 사이에서 옮기거나 순서를 바꾼다.
+  const canDrag = !item.done;
+  const canMove = !item.done && item.kind === 'task';
   const inUrgent = isUrgentTask(item); // 지금 급한 것 칸에 있는지(마감이 있어 저절로 들어간 것 포함)
 
   const startEdit = () => {
@@ -99,8 +117,36 @@ function Row({ item, store, now, index }: { item: Item; store: ItemsStore; now: 
       onDragStart={(e: DragEvent) => {
         e.dataTransfer.setData('text/plain', item.id);
         e.dataTransfer.effectAllowed = 'move';
+        onDragStartItem(item.id);
       }}
-      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', fontSize: 13 }}
+      onDragEnd={() => {
+        setOver(false);
+        onDragEndItem();
+      }}
+      onDragOver={(e: DragEvent) => {
+        if (!dragging || !canDropOn(item)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = 'move';
+        setOver(true);
+      }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(e: DragEvent) => {
+        setOver(false);
+        const id = e.dataTransfer.getData('text/plain');
+        if (!id) return;
+        e.preventDefault();
+        e.stopPropagation(); // 칸 전체(맨 끝으로 보내기)가 아니라 이 행 앞으로 넣는다
+        onDropOnto(id, item);
+      }}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        padding: '4px 0',
+        fontSize: 13,
+        boxShadow: over ? `0 -2px 0 0 ${color.blue}` : 'none', // 놓을 자리를 보여 주는 파란 줄
+      }}
     >
       {index !== undefined && (
         <span data-testid={index === null ? undefined : 'row-number'} style={{ width: 16, flexShrink: 0, textAlign: 'right', fontSize: 11, color: color.sub }}>
@@ -162,26 +208,26 @@ function Row({ item, store, now, index }: { item: Item; store: ItemsStore; now: 
         </span>
         )
       )}
-      {canDrag && !inUrgent && (
+      {canMove && !inUrgent && (
         <button
           aria-label={`${item.text} 급한 것으로 올리기`}
           title="급한 것으로 올리기"
           onClick={(e) => {
             stop(e);
-            void store.update(item.id, { urgent: true });
+            onMove(item, 'urgent');
           }}
           style={moveButton}
         >
           🔥 급함
         </button>
       )}
-      {canDrag && inUrgent && (
+      {canMove && inUrgent && (
         <button
           aria-label={`${item.text} 급한 것에서 내리기`}
           title="할일로 내리기"
           onClick={(e) => {
             stop(e);
-            void store.update(item.id, { urgent: false });
+            onMove(item, 'todo');
           }}
           style={moveButton}
         >
@@ -241,20 +287,59 @@ export function Widget({ store, hotkeyLabel, notice, onRaise, onOpenQuick, onOpe
   const todos = plainTodos(store.items);
   // 오늘 완료한 항목은 각 목록 맨 아래에 남긴다(자정이 지나면 사라진다).
   const doneTasks = doneToday(store.items, now).filter((i) => i.kind === 'task');
-  const eventsShown = [
-    ...upcomingEvents(store.items, now).filter((i) => !i.done),
-    ...doneToday(store.items, now).filter((i) => i.kind === 'event'),
-  ];
+  const eventsActive = upcomingEvents(store.items, now).filter((i) => !i.done);
+  const eventsShown = [...eventsActive, ...doneToday(store.items, now).filter((i) => i.kind === 'event')];
   const isUrgent = isUrgentTask;
   const urgentShown = withNumbers([...urgent, ...doneTasks.filter(isUrgent)]);
   const todosShown = withNumbers([...todos, ...doneTasks.filter((i) => !isUrgent(i))]);
 
-  // 끌어 놓은 칸으로 옮긴다. 이미 그 칸에 있으면 아무 일도 하지 않는다.
-  const moveTo = (id: string, target: 'urgent' | 'todo') => {
+  const [dragId, setDragId] = useState<string | null>(null);
+  const dragging = dragId ? (store.items.find((i) => i.id === dragId) ?? null) : null;
+
+  type ListKey = 'event' | 'urgent' | 'todo';
+  const lists: Record<ListKey, Item[]> = { event: eventsActive, urgent, todo: todos };
+
+  /**
+   * dragged를 key 목록의 beforeId 항목 앞(null이면 맨 끝)에 넣는다. 다른 칸이면 급한 것/할일도 함께 바꾼다.
+   * 그 목록의 모든 항목에 1000, 2000, … 순번을 새로 주고, 바뀐 것만 한 번에 저장한다.
+   */
+  const place = (dragged: Item, key: ListKey, beforeId: string | null) => {
+    if (dragged.done || dragged.deleted) return;
+    if ((dragged.kind === 'event') !== (key === 'event')) return; // 일정은 일정 칸에서만 움직인다
+    const base = lists[key].filter((i) => i.id !== dragged.id);
+    const at = beforeId === null ? base.length : base.findIndex((i) => i.id === beforeId);
+    if (at < 0) return;
+    const next = [...base.slice(0, at), dragged, ...base.slice(at)];
+    const sameList = lists[key].some((i) => i.id === dragged.id);
+    if (sameList && next.every((it, i) => it.id === lists[key][i].id)) return; // 순서가 그대로면 저장하지 않는다
+    const changes: { id: string; patch: ItemPatch }[] = [];
+    next.forEach((it, i) => {
+      const patch: ItemPatch = {};
+      if (it.order !== (i + 1) * 1000) patch.order = (i + 1) * 1000;
+      if (it.id === dragged.id && key !== 'event' && !sameList) patch.urgent = key === 'urgent';
+      if (Object.keys(patch).length > 0) changes.push({ id: it.id, patch });
+    });
+    if (changes.length > 0) void store.updateMany(changes);
+  };
+
+  const keyOf = (it: Item): ListKey => (it.kind === 'event' ? 'event' : isUrgent(it) ? 'urgent' : 'todo');
+  const dropOnZone = (id: string, key: ListKey) => {
     const it = store.items.find((i) => i.id === id);
-    if (!it || it.done || it.deleted || it.kind !== 'task') return;
-    if (isUrgent(it) === (target === 'urgent')) return;
-    void store.update(id, { urgent: target === 'urgent' });
+    if (it) place(it, key, null);
+  };
+  const rowProps = {
+    store,
+    now,
+    dragging,
+    canDropOn: (t: Item) =>
+      !!dragging && !dragging.done && !t.done && dragging.id !== t.id && (dragging.kind === 'event') === (t.kind === 'event'),
+    onDragStartItem: setDragId,
+    onDragEndItem: () => setDragId(null),
+    onDropOnto: (id: string, target: Item) => {
+      const it = store.items.find((i) => i.id === id);
+      if (it && !target.done) place(it, keyOf(target), target.id);
+    },
+    onMove: (it: Item, target: 'urgent' | 'todo') => place(it, target, null),
   };
 
   return (
@@ -338,30 +423,30 @@ export function Widget({ store, hotkeyLabel, notice, onRaise, onOpenQuick, onOpe
       >
       <div data-testid="widget-content">
       {eventsShown.length > 0 && (
-        <>
+        <Zone testId="event-zone" onDropId={(id) => dropOnZone(id, 'event')}>
           <h3 style={{ fontSize: 12, color: color.sub, margin: '8px 0 4px' }}>🗓 일정</h3>
           <ul data-testid="event-list" style={listStyle}>
             {eventsShown.map((it) => (
-              <Row key={it.id} item={it} store={store} now={now} />
+              <Row key={it.id} item={it} {...rowProps} />
             ))}
           </ul>
-        </>
+        </Zone>
       )}
 
-      <Zone testId="urgent-zone" onDropId={(id) => moveTo(id, 'urgent')}>
+      <Zone testId="urgent-zone" onDropId={(id) => dropOnZone(id, 'urgent')}>
         <h3 style={{ fontSize: 12, color: color.sub, margin: '8px 0 4px' }}>🔥 급한 것</h3>
         <ul data-testid="urgent-list" style={listStyle}>
           {urgentShown.map(({ it, n }) => (
-            <Row key={it.id} item={it} store={store} now={now} index={n} />
+            <Row key={it.id} item={it} {...rowProps} index={n} />
           ))}
         </ul>
       </Zone>
 
-      <Zone testId="todo-zone" onDropId={(id) => moveTo(id, 'todo')}>
+      <Zone testId="todo-zone" onDropId={(id) => dropOnZone(id, 'todo')}>
         <h3 style={{ fontSize: 12, color: color.sub, margin: '12px 0 4px' }}>📝 할일 ({todos.length})</h3>
         <ul data-testid="todo-list" style={listStyle}>
           {todosShown.map(({ it, n }) => (
-            <Row key={it.id} item={it} store={store} now={now} index={n} />
+            <Row key={it.id} item={it} {...rowProps} index={n} />
           ))}
         </ul>
       </Zone>

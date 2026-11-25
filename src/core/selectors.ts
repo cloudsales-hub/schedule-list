@@ -4,6 +4,14 @@ import { toLocalIso } from './model';
 /** 완료되지 않았고 삭제되지 않은 항목. */
 const active = (it: Item) => !it.done && !it.deleted;
 
+/** 직접 정한 순서(order)가 있는 것이 먼저 오고, 없는 것끼리는 fallback 규칙을 따른다. */
+const manualFirst = (fallback: (a: Item, b: Item) => number) => (a: Item, b: Item) => {
+  if (a.order !== undefined && b.order !== undefined) return a.order - b.order;
+  if (a.order !== undefined) return -1;
+  if (b.order !== undefined) return 1;
+  return fallback(a, b);
+};
+
 const byDue = (a: Item, b: Item) => (a.due! < b.due! ? -1 : a.due! > b.due! ? 1 : 0);
 
 /**
@@ -22,7 +30,7 @@ const urgentOrder = (a: Item, b: Item) => {
 
 /** 급한 할일: 마감이 있거나 급함 표시를 한 할일. 이미 지난 것도 포함한다. */
 export function urgentTasks(items: Item[], _now: Date): Item[] {
-  return items.filter((i) => active(i) && isUrgentTask(i)).sort(urgentOrder);
+  return items.filter((i) => active(i) && isUrgentTask(i)).sort(manualFirst(urgentOrder));
 }
 
 /** urgentTasks 중 마감이 (오늘 + 7일) 끝 이전인 것. */
@@ -36,7 +44,7 @@ export function soonTasks(items: Item[], now: Date): Item[] {
 export function plainTodos(items: Item[]): Item[] {
   return items
     .filter((i) => active(i) && i.kind === 'task' && !isUrgentTask(i))
-    .sort((a, b) => a.createdAt - b.createdAt);
+    .sort(manualFirst((a, b) => a.createdAt - b.createdAt));
 }
 
 /** 오늘 0시 이후의 일정, 빠른 순. */
@@ -44,7 +52,7 @@ export function upcomingEvents(items: Item[], now: Date, limit?: number): Item[]
   const startIso = toLocalIso(new Date(now.getFullYear(), now.getMonth(), now.getDate()));
   const list = items
     .filter((i) => active(i) && i.kind === 'event' && i.due !== null && i.due >= startIso)
-    .sort(byDue);
+    .sort(manualFirst(byDue));
   return limit === undefined ? list : list.slice(0, limit);
 }
 
